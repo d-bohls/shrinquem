@@ -49,6 +49,9 @@ GetTickCountForOS(void)
 
 #endif
 
+unsigned long globalTermsKept = 0;
+unsigned long globalTermsRemoved = 0;
+
 static void TestOneSpecificTruthTable(void);
 static void TestOneRandomTruthTable(void);
 static void TestAllTruthTables(void);
@@ -90,12 +93,12 @@ TestOneSpecificTruthTable(void)
 
     const numVars = 4;
     const triLogic truthTable[16] =
-    {
-        1,1,1,0,
-        0,1,1,1,
-        1,0,0,1,
-        0,0,1,1,
-    };
+        {
+            1,1,1,0,
+            0,1,1,1,
+            1,0,0,1,
+            0,0,1,1,
+        };
 
     unsigned long timer = GetTickCountForOS();
     retVal = ReduceLogic(numVars, truthTable, &numTerms, &terms, &dontCares);
@@ -116,7 +119,10 @@ TestOneSpecificTruthTable(void)
 
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
-    printf("\nNumber failures : %i\n", numFailures);
+    printf("\nNumber failures : %i", numFailures);
+    printf("\nTerms removed   : %i", globalTermsRemoved);
+    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\n");
 }
 
 static void
@@ -158,7 +164,10 @@ TestOneRandomTruthTable(void)
 
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
-    printf("\nNumber failures : %i\n", numFailures);
+    printf("\nNumber failures : %i", numFailures);
+    printf("\nTerms removed   : %i", globalTermsRemoved);
+    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\n");
 }
 
 static void
@@ -241,7 +250,10 @@ TestAllTruthTables(void)
 
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
-    printf("\nNumber failures : %i\n", numFailures);
+    printf("\nNumber failures : %i", numFailures);
+    printf("\nTerms removed   : %i", globalTermsRemoved);
+    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\n");
 }
 
 static void
@@ -300,7 +312,10 @@ TestAllTruthTablesWithOneFalse(void)
 
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
-    printf("\nNumber failures : %i\n", numFailures);
+    printf("\nNumber failures : %i", numFailures);
+    printf("\nTerms removed   : %i", globalTermsRemoved);
+    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\n");
 }
 
 static void
@@ -359,7 +374,10 @@ TestAllTruthTablesWithOneTrue(void)
 
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
-    printf("\nNumber failures : %i\n", numFailures);
+    printf("\nNumber failures : %i", numFailures);
+    printf("\nTerms removed   : %i", globalTermsRemoved);
+    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\n");
 }
 
 static void
@@ -411,7 +429,10 @@ TestSomeRandomTruthTables(void)
 
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
-    printf("\nNumber failures : %i\n", numFailures);
+    printf("\nNumber failures : %i", numFailures);
+    printf("\nTerms removed   : %i", globalTermsRemoved);
+    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\n");
 }
 
 /* returns a random integer between min and max inclusively */
