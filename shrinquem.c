@@ -367,7 +367,7 @@ GenerateEquation(
     unsigned long iCharPos;
     unsigned long bitMask;
     size_t *varNameSizes = NULL;
-    unsigned long outputSize;
+    size_t outputSize;
     unsigned long freeVarNames = 0;
 
     /*=============================================================
@@ -457,7 +457,9 @@ GenerateEquation(
             }
 
             /* now run through the equation to determine what size the output string will be */
-            iTermPos = iEquPos = outputSize = 0;
+            iTermPos = 0;
+            iEquPos = 0;
+            outputSize = 0;
             for (iTerm = 0; iTerm < numTerms; iTerm++)
             {
                 for (iVar = 0; iVar < numVars; iVar++)

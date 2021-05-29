@@ -62,7 +62,7 @@ static void GetRandomBoolArray(unsigned long numElements, char boolArray[]);
 
 int main(int argc, char *argv[])
 {
-    srand(time(NULL));
+    srand((unsigned int)time(NULL));
 
     TestOneSpecificTruthTable();
     TestOneRandomTruthTable();
@@ -191,6 +191,12 @@ TestAllTruthTables(void)
         printf("    %i possible inputs.\n", numOfPossibleInputs);
         printf("    %i possible truth tables.\n", numOfPossibleTruthTables);
         truthTable = calloc(numOfPossibleInputs, sizeof(triLogic));
+        if (truthTable == NULL)
+        {
+            numFailures++;
+            break;
+        }
+
         while (1)
         {
             /* reduce this truth table */
@@ -260,6 +266,12 @@ TestAllTruthTablesWithOneFalse(void)
         printf("Testing %d variables...\n", iVars);
         unsigned long numOfPossibleInputs = 1 << iVars;
         truthTable = malloc(numOfPossibleInputs * sizeof(long));
+        if (truthTable == NULL)
+        {
+            numFailures++;
+            break;
+        }
+
         for (unsigned long iFalse = 0; iFalse < numOfPossibleInputs; iFalse++)
         {
             for (unsigned long iInput = 0; iInput < numOfPossibleInputs; iInput++)
@@ -313,6 +325,12 @@ TestAllTruthTablesWithOneTrue(void)
         printf("Testing %d variables...\n", iVars);
         unsigned long numOfPossibleInputs = 1 << iVars;
         truthTable = malloc(numOfPossibleInputs * sizeof(long));
+        if (truthTable == NULL)
+        {
+            numFailures++;
+            break;
+        }
+
         for (unsigned long iTrue = 0; iTrue < numOfPossibleInputs; iTrue++)
         {
             for (unsigned long iInput = 0; iInput < numOfPossibleInputs; iInput++)
