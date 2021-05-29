@@ -13,8 +13,8 @@
 #include <string.h>
 #include "shrinquem.h"
 
-extern unsigned long globalTermsRemoved;
-extern unsigned long globalTermsKept;
+unsigned long globalTermsKept = 0;
+unsigned long globalTermsRemoved = 0;
 
 static void RemoveNonprimeImplicants(
     const unsigned long numVars,

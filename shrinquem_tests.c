@@ -49,8 +49,8 @@ GetTickCountForOS(void)
 
 #endif
 
-unsigned long globalTermsKept = 0;
-unsigned long globalTermsRemoved = 0;
+extern unsigned long globalTermsRemoved;
+extern unsigned long globalTermsKept;
 
 static void TestOneSpecificTruthTable(void);
 static void TestOneRandomTruthTable(void);
@@ -90,6 +90,9 @@ TestOneSpecificTruthTable(void)
 
     printf("\n\n============================================================");
     printf("\n\nPerforming TestOneSpecificTruthTable test...\n\n");
+
+    globalTermsKept = 0;
+    globalTermsRemoved = 0;
 
     const numVars = 4;
     const triLogic truthTable[16] =
@@ -138,6 +141,9 @@ TestOneRandomTruthTable(void)
 
     printf("\n\n============================================================");
     printf("\n\nPerforming TestOneRandomTruthTable test...\n\n");
+
+    globalTermsKept = 0;
+    globalTermsRemoved = 0;
 
     const unsigned long numVars = 5;
     unsigned long numOfPossibleInputs = 1 << numVars;
@@ -189,6 +195,9 @@ TestAllTruthTables(void)
 
     printf("\n\n============================================================");
     printf("\n\nPerforming TestAllTruthTables test...\n\n");
+
+    globalTermsKept = 0;
+    globalTermsRemoved = 0;
 
     const unsigned long startNumVars = 1;
     const unsigned long endNumVars = 4;
@@ -271,6 +280,9 @@ TestAllTruthTablesWithOneFalse(void)
     printf("\n\n============================================================");
     printf("\n\nPerforming TestAllTruthTablesWithOneFalse test...\n\n");
 
+    globalTermsKept = 0;
+    globalTermsRemoved = 0;
+
     const unsigned long minVar = 1;
     const unsigned long maxVar = 12;
     for (unsigned long iVars = minVar; iVars <= maxVar; iVars++)
@@ -332,6 +344,9 @@ TestAllTruthTablesWithOneTrue(void)
 
     printf("\n\n============================================================");
     printf("\n\nPerforming TestAllTruthTablesWithOneTrue test...\n\n");
+
+    globalTermsKept = 0;
+    globalTermsRemoved = 0;
 
     const unsigned long minVar = 1;
     const unsigned long maxVar = 12;
@@ -402,6 +417,9 @@ TestSomeRandomTruthTables(void)
 
     printf("\n\n============================================================");
     printf("\n\nPerforming TestSomeRandomTruthTables test...\n\n");
+
+    globalTermsKept = 0;
+    globalTermsRemoved = 0;
 
     for (iTest = 1; iTest <= numTests; iTest++)
     {
