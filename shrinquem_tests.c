@@ -54,6 +54,7 @@ extern unsigned long globalTermsKept;
 
 static void TestOneSpecificTruthTable(void);
 static void TestOneRandomTruthTable(void);
+static void TestEquationGeneration(void);
 static void TestAllTruthTables(void);
 static void TestAllTruthTablesWithOneFalse(void);
 static void TestAllTruthTablesWithOneTrue(void);
@@ -69,6 +70,7 @@ int main(int argc, char *argv[])
 
     TestOneSpecificTruthTable();
     TestOneRandomTruthTable();
+    TestEquationGeneration();
     TestAllTruthTables();
     TestAllTruthTablesWithOneFalse();
     TestAllTruthTablesWithOneTrue();
@@ -160,6 +162,71 @@ TestOneRandomTruthTable(void)
     {
         PrintEquation(numVars, numTerms, terms, dontCares);
         TestAllInputs(numVars, truthTable, numTerms, terms, dontCares, &numRight, &numWrong);
+        free(terms);
+        free(dontCares);
+    }
+    else
+    {
+        numFailures++;
+    }
+
+    printf("\nNumber right    : %i", numRight);
+    printf("\nNumber wrong    : %i", numWrong);
+    printf("\nNumber failures : %i", numFailures);
+    printf("\nTerms removed   : %i", globalTermsRemoved);
+    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\n");
+}
+
+static void
+TestEquationGeneration(void)
+{
+    enum shrinqStatus retVal;
+    unsigned long numTerms;
+    unsigned long *terms = NULL;
+    unsigned long *dontCares = NULL;
+    unsigned long numRight = 0;
+    unsigned long numWrong = 0;
+    unsigned long numFailures = 0;
+
+    printf("\n\n============================================================");
+    printf("\n\nPerforming TestEquationGeneration test...\n\n");
+
+    globalTermsKept = 0;
+    globalTermsRemoved = 0;
+
+    const unsigned long numVars = 4;
+    unsigned long numOfPossibleInputs = 1 << numVars;
+    size_t memSize = numOfPossibleInputs * sizeof(triLogic);
+    triLogic *truthTable = (triLogic *)malloc(memSize);
+    GetRandomBoolArray(numOfPossibleInputs, truthTable);
+
+    unsigned long timer = GetTickCountForOS();
+    retVal = ReduceLogic(numVars, truthTable, &numTerms, &terms, &dontCares);
+    timer = GetTickCountForOS() - timer;
+    printf("Test took %i %s with %i variables...\n", timer, unitsGetTickCount, numVars);
+
+    if (retVal == STATUS_OKAY)
+    {
+        TestAllInputs(numVars, truthTable, numTerms, terms, dontCares, &numRight, &numWrong);
+
+        const char *const variableNames[] =
+            {
+                "Apple",
+                "Pear",
+                "Banana",
+                "Mango",
+            };
+
+        char *equation;
+        GenerateEquation(numVars, numTerms, terms, dontCares, variableNames, &equation);
+        if (equation)
+        {
+            printf("\n%s\n", equation);
+            free(equation);
+            equation = NULL;
+        }
+
         free(terms);
         free(dontCares);
     }
