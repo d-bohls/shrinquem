@@ -1,4 +1,6 @@
-
+// shrinquem - An algorithm for logic minimization.
+// Copyright (C) 2021 Damon Bohls <damonbohls@gmail.com>
+// MIT License: https://github.com/d-bohls/shrinquem/blob/main/LICENSE
 
 #define BITS_PER_BYTE (8)
 
@@ -755,31 +757,17 @@ EvaluateSumOfProducts(
     const unsigned long dontCares[],
     const unsigned long input)
 {
-    unsigned long iTerm;
-    unsigned long iVar;
-    unsigned long bitMask;
-    triLogic result;
+    /* clear out bits that might be set in the input which are beyond the number of variables we are evaluating */
+    const unsigned long mask = (1 << numVars) - 1;
+    unsigned long constrainedInput = input & mask;
 
-    for (iTerm = 0; iTerm < numTerms; iTerm++)
+    for (unsigned long iTerm = 0; iTerm < numTerms; iTerm++)
     {
-        for (iVar = 0; iVar < numVars; iVar++)
-        {
-            bitMask = 1 << iVar;
-
-            if (dontCares[iTerm] & bitMask)
-                continue; /* a "don't care" makes the condition TRUE */
-            else if ((input & bitMask) != (terms[iTerm] & bitMask))
-                break; /* one FALSE condition makes the whole product term FALSE */
-        }
-
-        if (iVar == numVars)
-            break; /* one TRUE product term makes the whole sum-of-products TRUE */
+        /* one TRUE product term makes the whole sum-of-products TRUE */
+        if ((constrainedInput | dontCares[iTerm]) == (terms[iTerm] | dontCares[iTerm]))
+            return LOGIC_TRUE;
     }
 
-    if (iTerm < numTerms)
-        result = LOGIC_TRUE; /* we must have found a true product term and exited early, so the equation is true */
-    else
-        result = LOGIC_FALSE; /* no product terms were true, so the whole equation is false */
-
-    return result;
+    /* no product terms were true, so the whole equation is false */
+    return LOGIC_FALSE;
 }
