@@ -93,6 +93,7 @@ ReduceLogic(
 {
     enum shrinqStatus status = STATUS_OKAY;
     unsigned long maxVariables;
+    unsigned long maxTerms;
     unsigned long sizeTruthtable;
     unsigned long numMinterms;
     unsigned long iInput;
@@ -101,7 +102,7 @@ ReduceLogic(
     unsigned long iBitDC;
     unsigned long bitMaskTest;
     unsigned long bitMaskDC;
-    char *resolved = NULL;
+    triLogic *resolved = NULL;
 
     /*=============================================================
         initialize and allocate
@@ -156,9 +157,11 @@ ReduceLogic(
         }
     }
 
+    maxTerms = min(numMinterms, sizeTruthtable / 2);
+
     resolved = calloc(sizeTruthtable, sizeof(triLogic));
-    (*terms) = malloc(numMinterms * sizeof(long));
-    (*dontCares) = malloc(numMinterms * sizeof(long));
+    (*terms) = malloc(maxTerms * sizeof(long));
+    (*dontCares) = malloc(maxTerms * sizeof(long));
 
     if (resolved == NULL || terms == NULL || dontCares == NULL)
     {
@@ -447,10 +450,7 @@ GenerateEquation(
             /* first calculate the size of the string names for the variables */
             varNameSizes = (size_t *)malloc(sizeof(long *) * numVars);
             if (varNameSizes == NULL)
-            {
                 return STATUS_OUT_OF_MEMORY;
-            }
-
             for (iVar = 0; iVar < numVars; iVar++)
             {
                 varNameSizes[iVar] = strlen(varNames[iVar]);
