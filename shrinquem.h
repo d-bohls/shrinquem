@@ -20,29 +20,30 @@ enum shrinqStatus
     STATUS_NULL_ARGUMENT,
 };
 
-extern enum shrinqStatus
-ReduceLogic(
+extern enum shrinqStatus ReduceLogic(
     const unsigned long numVars,
     const triLogic truthTable[],
     unsigned long *numTerms,
     unsigned long *terms[],
     unsigned long *dontCares[]);
 
-extern enum shrinqStatus
-GenerateEquation(
+extern enum shrinqStatus GenerateEquation(
     const unsigned long numVars,
+    char* varNames[],
     const unsigned long numTerms,
     const unsigned long terms[],
     const unsigned long dontCares[],
-    char *varNames[],
     char *equation[]);
 
-extern triLogic
-EvaluateSumOfProducts(
+extern triLogic EvaluateSumOfProducts(
     const unsigned long numVars,
     const unsigned long numTerms,
     const unsigned long terms[],
     const unsigned long dontCares[],
     const unsigned long input);
+
+extern void ResetTermCounters();
+extern unsigned long GetNumTermsKept();
+extern unsigned long GetNumTermsRemoved();
 
 #endif /* !defined(INC_SHRINQUEM_H) */

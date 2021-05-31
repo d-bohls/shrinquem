@@ -4,17 +4,12 @@
 
 #define BITS_PER_BYTE (8)
 
-//#define LR_DEBUG
-#if defined(LR_DEBUG)
-#include <stdio.h>
-#endif
-
 #include <stdlib.h>
-#include <string.h>
+#include <string.h> // used for strlen
 #include "shrinquem.h"
 
-unsigned long globalTermsKept = 0;
-unsigned long globalTermsRemoved = 0;
+static unsigned long numTermsKept = 0;
+static unsigned long numTermsRemoved = 0;
 
 static void RemoveNonprimeImplicants(
     const unsigned long numVars,
@@ -94,8 +89,7 @@ terms[1]     = b011 = 3   <~~ Var2 (bit position 1) and Var3 (bit position 0) bo
 
 *************************************************************************/
 
-extern enum shrinqStatus
-ReduceLogic(
+extern enum shrinqStatus ReduceLogic(
     const unsigned long numVars,
     const triLogic truthTable[],
     unsigned long *numTerms,
@@ -326,190 +320,7 @@ finalExit:
         }
     }
 
-#if defined(LR_DEBUG)
-    printf("\n");
-    printf("sizeTruthtable : %i\n", sizeTruthtable);
-    printf("numMinterms    : %i\n", numMinterms);
-    if (numTerms)
-        printf("numTerms       : %i\n", (*numTerms));
-    printf("\n");
-#endif /* defined(LR_DEBUG) */
-
     return status;
-}
-
-/*************************************************************************
-RemoveNonprimeImplicants
-Purpose - removes terms which are non-prime implicants.
-Inputs:
-  numVars - number of variables/inputs
-  numTerms - number of terms in the sum-of-products, returned by ReduceLogic
-  terms - terms in the sum-of-products, returned by ReduceLogic
-  dontCares - dontCares in the sum-of-products, returned by ReduceLogic
-Outputs:
-  numTerms, terms, and dontCares are modified directly when terms can be removed
-*************************************************************************/
-
-static void
-RemoveNonprimeImplicants(
-    const unsigned long numVars,
-    unsigned long *numTerms,
-    unsigned long *terms[],
-    unsigned long *dontCares[])
-{
-    unsigned long *refCntTable;
-    unsigned long sizeTruthtable;
-    unsigned long numOldTerms;
-    unsigned long iOldTerm;
-    unsigned long iNewTerm;
-    unsigned long iBitDC;
-    unsigned long bitMaskDC;
-    char isPrime;
-
-    numOldTerms = (*numTerms);
-
-    sizeTruthtable = 1 << numVars; /* the truth table has 2^numVars elements */
-
-    refCntTable = (long *)calloc(sizeTruthtable, sizeof(long));
-
-    /* loop through each term and ref count the minterms that the term covers */
-    for (iOldTerm = 0; iOldTerm < numOldTerms; iOldTerm++)
-    {
-        /* start by clearing all the don't care bits */
-        (*terms)[iOldTerm] &= ~((*dontCares)[iOldTerm]);
-
-        while (1)
-        {
-            /* add a ref count to this minterm */
-            refCntTable[(*terms)[iOldTerm]]++;
-            /* get the next minterm to ref count */
-            for (iBitDC = 0; iBitDC < numVars; iBitDC++)
-            {
-                bitMaskDC = 1 << iBitDC;
-                if ((*dontCares)[iOldTerm] & bitMaskDC)
-                {
-                    if ((*terms)[iOldTerm] & bitMaskDC)
-                    {
-                        /* clear the bit and continue */
-                        (*terms)[iOldTerm] &= ~bitMaskDC;
-                    }
-                    else
-                    {
-                        /* set the bit and exit */
-                        (*terms)[iOldTerm] |= bitMaskDC;
-                        break;
-                    }
-                }
-            }
-            if (iBitDC == numVars)
-            {
-                /* we're all done ref counting minterms */
-                break;
-            }
-        } /* end of while loop */
-    }
-
-    /* now loop through each term again and remove terms if all its minterms are ref counted more than once */
-    for (iNewTerm = iOldTerm = 0; iOldTerm < numOldTerms; iOldTerm++)
-    {
-        isPrime = 0;
-
-        /* start by clearing all the don't care bits */
-        (*terms)[iOldTerm] &= ~((*dontCares)[iOldTerm]);
-
-        while (1)
-        {
-            /* exit early if minterm is ref counted once, this term is a prime implicant and we will keep it */
-            if (refCntTable[(*terms)[iOldTerm]] == 1)
-            {
-                isPrime = 1;
-                break;
-            }
-
-            /* get the next minterm to ref count */
-            for (iBitDC = 0; iBitDC < numVars; iBitDC++)
-            {
-                bitMaskDC = 1 << iBitDC;
-                if ((*dontCares)[iOldTerm] & bitMaskDC)
-                {
-                    if ((*terms)[iOldTerm] & bitMaskDC)
-                    {
-                        /* clear the bit and continue */
-                        (*terms)[iOldTerm] &= ~bitMaskDC;
-                    }
-                    else
-                    {
-                        /* set the bit and exit */
-                        (*terms)[iOldTerm] |= bitMaskDC;
-                        break;
-                    }
-                }
-            }
-            if (iBitDC == numVars)
-            {
-                /* we're all done checking minterms associated with this term */
-                break;
-            }
-        } /* end of while loop */
-
-        if (isPrime)
-        {
-            /* keep this term, copy it down to the next spot */
-            if (iOldTerm != iNewTerm)
-            {
-                (*terms)[iNewTerm] = (*terms)[iOldTerm];
-                (*dontCares)[iNewTerm] = (*dontCares)[iOldTerm];
-            }
-            iNewTerm++;
-            globalTermsKept++;
-        }
-        else
-        {
-            /* this term is a non-prime implicant and will not be kept */
-            (*numTerms)--;
-            globalTermsRemoved++;
-
-            /* de-ref count this term's minterms */
-            (*terms)[iOldTerm] &= ~((*dontCares)[iOldTerm]);
-            while (1)
-            {
-                refCntTable[(*terms)[iOldTerm]]--;
-
-                /* get the next minterm the needs its ref count decremented */
-                for (iBitDC = 0; iBitDC < numVars; iBitDC++)
-                {
-                    bitMaskDC = 1 << iBitDC;
-                    if ((*dontCares)[iOldTerm] & bitMaskDC)
-                    {
-                        if ((*terms)[iOldTerm] & bitMaskDC)
-                        {
-                            /* clear the bit and continue */
-                            (*terms)[iOldTerm] &= ~bitMaskDC;
-                        }
-                        else
-                        {
-                            /* set the bit and exit */
-                            (*terms)[iOldTerm] |= bitMaskDC;
-                            break;
-                        }
-                    }
-                }
-                if (iBitDC == numVars)
-                {
-                    /* we're all done decrementing ref counts */
-                    break;
-                }
-            } /* end of while loop */
-        }
-    }
-
-    free(refCntTable);
-
-    if ((*numTerms) != numOldTerms)
-    {
-        *terms = realloc(*terms, (*numTerms) * sizeof(long));
-        *dontCares = realloc(*dontCares, (*numTerms) * sizeof(long));
-    }
 }
 
 /*************************************************************************
@@ -526,13 +337,12 @@ Outputs:
   equation - null-terminated string representation of the minimum sum-of-products equation
 *************************************************************************/
 
-extern enum shrinqStatus
-GenerateEquation(
+extern enum shrinqStatus GenerateEquation(
     const unsigned long numVars,
+    char* varNames[],
     const unsigned long numTerms,
     const unsigned long terms[],
     const unsigned long dontCares[],
-    char *varNames[],
     char *equation[])
 {
     enum shrinqStatus retVal = STATUS_OKAY;
@@ -749,8 +559,7 @@ Outputs:
   the boolean result of the sum-of-products evaluated for the inputs
 *************************************************************************/
 
-extern triLogic
-EvaluateSumOfProducts(
+extern triLogic EvaluateSumOfProducts(
     const unsigned long numVars,
     const unsigned long numTerms,
     const unsigned long terms[],
@@ -770,4 +579,184 @@ EvaluateSumOfProducts(
 
     /* no product terms were true, so the whole equation is false */
     return LOGIC_FALSE;
+}
+
+extern void ResetTermCounters()
+{
+    numTermsKept = 0;
+    numTermsRemoved = 0;
+}
+
+extern unsigned long GetNumTermsKept()
+{
+    return numTermsKept;
+}
+
+extern unsigned long GetNumTermsRemoved()
+{
+    return numTermsRemoved;
+}
+
+/*************************************************************************
+RemoveNonprimeImplicants
+Purpose - removes terms which are non-prime implicants.
+Inputs:
+  numVars - number of variables/inputs
+  numTerms - number of terms in the sum-of-products, returned by ReduceLogic
+  terms - terms in the sum-of-products, returned by ReduceLogic
+  dontCares - dontCares in the sum-of-products, returned by ReduceLogic
+Outputs:
+  numTerms, terms, and dontCares are modified directly when terms can be removed
+*************************************************************************/
+
+static void RemoveNonprimeImplicants(
+    const unsigned long numVars,
+    unsigned long* numTerms,
+    unsigned long* terms[],
+    unsigned long* dontCares[])
+{
+    unsigned long* refCntTable;
+    unsigned long sizeTruthtable;
+    unsigned long numOldTerms;
+    unsigned long iOldTerm;
+    unsigned long iNewTerm;
+    unsigned long bitMaskDC;
+    char isPrime;
+
+    numOldTerms = (*numTerms);
+
+    sizeTruthtable = 1 << numVars; // the truth table has 2^numVars elements
+
+    refCntTable = (long*)calloc(sizeTruthtable, sizeof(long));
+
+    // loop through each term and ref count the minterms that the term covers
+    for (iOldTerm = 0; iOldTerm < numOldTerms; iOldTerm++)
+    {
+        // start by clearing all the don't care bits
+        (*terms)[iOldTerm] &= ~((*dontCares)[iOldTerm]);
+
+        while (1)
+        {
+            refCntTable[(*terms)[iOldTerm]]++;
+
+            // get the next minterm to ref count
+            unsigned long iBitDC;
+            for (iBitDC = 0; iBitDC < numVars; iBitDC++)
+            {
+                bitMaskDC = 1 << iBitDC;
+                if ((*dontCares)[iOldTerm] & bitMaskDC)
+                {
+                    if ((*terms)[iOldTerm] & bitMaskDC)
+                    {
+                        (*terms)[iOldTerm] &= ~bitMaskDC;
+                    }
+                    else
+                    {
+                        (*terms)[iOldTerm] |= bitMaskDC;
+                        break;
+                    }
+                }
+            }
+            if (iBitDC == numVars)
+            {
+                break;
+            }
+        }
+    }
+
+    // now loop through each term again and remove terms if all its minterms are ref counted more than once
+    for (iNewTerm = iOldTerm = 0; iOldTerm < numOldTerms; iOldTerm++)
+    {
+        isPrime = 0;
+        (*terms)[iOldTerm] &= ~((*dontCares)[iOldTerm]); // clear all the don't care bits
+
+        while (1)
+        {
+            // exit early if minterm is ref counted once, this term is a prime implicant and we will keep it
+            if (refCntTable[(*terms)[iOldTerm]] == 1)
+            {
+                isPrime = 1;
+                break;
+            }
+
+            // get the next minterm to ref count
+            unsigned long iBitDC;
+            for (iBitDC = 0; iBitDC < numVars; iBitDC++)
+            {
+                bitMaskDC = 1 << iBitDC;
+                if ((*dontCares)[iOldTerm] & bitMaskDC)
+                {
+                    if ((*terms)[iOldTerm] & bitMaskDC)
+                    {
+                        (*terms)[iOldTerm] &= ~bitMaskDC;
+                    }
+                    else
+                    {
+                        (*terms)[iOldTerm] |= bitMaskDC;
+                        break;
+                    }
+                }
+            }
+            if (iBitDC == numVars)
+            {
+                break;
+            }
+        }
+
+        if (isPrime)
+        {
+            // keep this term, copy it down to the next spot
+            if (iOldTerm != iNewTerm)
+            {
+                (*terms)[iNewTerm] = (*terms)[iOldTerm];
+                (*dontCares)[iNewTerm] = (*dontCares)[iOldTerm];
+            }
+            iNewTerm++;
+            numTermsKept++;
+        }
+        else
+        {
+            // this term is a non-prime implicant and will not be kept
+            (*numTerms)--;
+            numTermsRemoved++;
+
+            // de-ref count this term's minterms
+            (*terms)[iOldTerm] &= ~((*dontCares)[iOldTerm]);
+            while (1)
+            {
+                refCntTable[(*terms)[iOldTerm]]--;
+
+                // get the next minterm the needs its ref count decremented
+                unsigned long iBitDC;
+                for (iBitDC = 0; iBitDC < numVars; iBitDC++)
+                {
+                    bitMaskDC = 1 << iBitDC;
+                    if ((*dontCares)[iOldTerm] & bitMaskDC)
+                    {
+                        if ((*terms)[iOldTerm] & bitMaskDC)
+                        {
+                            (*terms)[iOldTerm] &= ~bitMaskDC;
+                        }
+                        else
+                        {
+                            (*terms)[iOldTerm] |= bitMaskDC;
+                            break;
+                        }
+                    }
+                }
+                if (iBitDC == numVars)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    free(refCntTable);
+
+    if ((*numTerms) != numOldTerms)
+    {
+        *terms = realloc(*terms, (*numTerms) * sizeof(long));
+        *dontCares = realloc(*dontCares, (*numTerms) * sizeof(long));
+    }
 }

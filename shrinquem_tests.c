@@ -3,35 +3,24 @@
 // MIT License: https://github.com/d-bohls/shrinquem/blob/main/LICENSE
 
 #include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
-#include <time.h>
-#include <math.h>
+#include <stdio.h> // used for printf, ect.
+#include <time.h> // used for time() to seed srand
+#include <math.h> // used for floor
 #include "shrinquem.h"
 
 #if defined(_WIN32)
 
 #include <windows.h>
-static const char *unitsGetTickCount = "milliseconds";
-
-#endif
-
-#if defined(_WIN64)
-
-#define GetTickCountForOS GetTickCount64
-
-#elif defined(_WIN32)
-
+static const char* unitsGetTickCount = "milliseconds";
 #define GetTickCountForOS GetTickCount
 
 #elif defined(__unix__) || defined(__linux__)
 
+#include <errno.h>
 #include <sys/time.h>
 static const char *unitsGetTickCount = "microseconds";
 
-static long
-GetTickCountForOS(void)
+static long GetTickCountForOS(void)
 {
     struct timeval tv;
     unsigned long rc;
@@ -48,9 +37,6 @@ GetTickCountForOS(void)
 }
 
 #endif
-
-extern unsigned long globalTermsRemoved;
-extern unsigned long globalTermsKept;
 
 static void TestOneSpecificTruthTable(void);
 static void TestOneRandomTruthTable(void);
@@ -79,8 +65,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-static void
-TestOneSpecificTruthTable(void)
+static void TestOneSpecificTruthTable(void)
 {
     enum shrinqStatus retVal;
     unsigned long numTerms;
@@ -93,8 +78,7 @@ TestOneSpecificTruthTable(void)
     printf("\n\n============================================================");
     printf("\n\nPerforming TestOneSpecificTruthTable test...\n\n");
 
-    globalTermsKept = 0;
-    globalTermsRemoved = 0;
+    ResetTermCounters();
 
     const numVars = 4;
     const triLogic truthTable[16] =
@@ -125,13 +109,12 @@ TestOneSpecificTruthTable(void)
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
     printf("\nNumber failures : %i", numFailures);
-    printf("\nTerms removed   : %i", globalTermsRemoved);
-    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\nTerms kept      : %i", GetNumTermsKept());
+    printf("\nTerms removed   : %i", GetNumTermsRemoved());
     printf("\n");
 }
 
-static void
-TestOneRandomTruthTable(void)
+static void TestOneRandomTruthTable(void)
 {
     enum shrinqStatus retVal;
     unsigned long numTerms;
@@ -144,8 +127,7 @@ TestOneRandomTruthTable(void)
     printf("\n\n============================================================");
     printf("\n\nPerforming TestOneRandomTruthTable test...\n\n");
 
-    globalTermsKept = 0;
-    globalTermsRemoved = 0;
+    ResetTermCounters();
 
     const unsigned long numVars = 5;
     unsigned long numOfPossibleInputs = 1 << numVars;
@@ -173,13 +155,12 @@ TestOneRandomTruthTable(void)
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
     printf("\nNumber failures : %i", numFailures);
-    printf("\nTerms removed   : %i", globalTermsRemoved);
-    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\nTerms kept      : %i", GetNumTermsKept());
+    printf("\nTerms removed   : %i", GetNumTermsRemoved());
     printf("\n");
 }
 
-static void
-TestEquationGeneration(void)
+static void TestEquationGeneration(void)
 {
     enum shrinqStatus retVal;
     unsigned long numTerms;
@@ -192,8 +173,7 @@ TestEquationGeneration(void)
     printf("\n\n============================================================");
     printf("\n\nPerforming TestEquationGeneration test...\n\n");
 
-    globalTermsKept = 0;
-    globalTermsRemoved = 0;
+    ResetTermCounters();
 
     const unsigned long numVars = 4;
     unsigned long numOfPossibleInputs = 1 << numVars;
@@ -210,7 +190,7 @@ TestEquationGeneration(void)
     {
         TestAllInputs(numVars, truthTable, numTerms, terms, dontCares, &numRight, &numWrong);
 
-        const char *const variableNames[] =
+        char *variableNames[] =
             {
                 "Apple",
                 "Pear",
@@ -219,7 +199,7 @@ TestEquationGeneration(void)
             };
 
         char *equation;
-        GenerateEquation(numVars, numTerms, terms, dontCares, variableNames, &equation);
+        GenerateEquation(numVars, variableNames, numTerms, terms, dontCares, &equation);
         if (equation)
         {
             printf("\n%s\n", equation);
@@ -238,13 +218,12 @@ TestEquationGeneration(void)
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
     printf("\nNumber failures : %i", numFailures);
-    printf("\nTerms removed   : %i", globalTermsRemoved);
-    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\nTerms kept      : %i", GetNumTermsKept());
+    printf("\nTerms removed   : %i", GetNumTermsRemoved());
     printf("\n");
 }
 
-static void
-TestAllTruthTables(void)
+static void TestAllTruthTables(void)
 {
     enum shrinqStatus retVal;
     unsigned long numOfPossibleInputs;
@@ -263,8 +242,7 @@ TestAllTruthTables(void)
     printf("\n\n============================================================");
     printf("\n\nPerforming TestAllTruthTables test...\n\n");
 
-    globalTermsKept = 0;
-    globalTermsRemoved = 0;
+    ResetTermCounters();
 
     const unsigned long startNumVars = 1;
     const unsigned long endNumVars = 4;
@@ -327,13 +305,12 @@ TestAllTruthTables(void)
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
     printf("\nNumber failures : %i", numFailures);
-    printf("\nTerms removed   : %i", globalTermsRemoved);
-    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\nTerms kept      : %i", GetNumTermsKept());
+    printf("\nTerms removed   : %i", GetNumTermsRemoved());
     printf("\n");
 }
 
-static void
-TestAllTruthTablesWithOneFalse(void)
+static void TestAllTruthTablesWithOneFalse(void)
 {
     enum shrinqStatus retVal;
     unsigned long numTerms;
@@ -347,8 +324,7 @@ TestAllTruthTablesWithOneFalse(void)
     printf("\n\n============================================================");
     printf("\n\nPerforming TestAllTruthTablesWithOneFalse test...\n\n");
 
-    globalTermsKept = 0;
-    globalTermsRemoved = 0;
+    ResetTermCounters();
 
     const unsigned long minVar = 1;
     const unsigned long maxVar = 12;
@@ -392,13 +368,12 @@ TestAllTruthTablesWithOneFalse(void)
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
     printf("\nNumber failures : %i", numFailures);
-    printf("\nTerms removed   : %i", globalTermsRemoved);
-    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\nTerms kept      : %i", GetNumTermsKept());
+    printf("\nTerms removed   : %i", GetNumTermsRemoved());
     printf("\n");
 }
 
-static void
-TestAllTruthTablesWithOneTrue(void)
+static void TestAllTruthTablesWithOneTrue(void)
 {
     enum shrinqStatus retVal;
     unsigned long numTerms;
@@ -412,8 +387,7 @@ TestAllTruthTablesWithOneTrue(void)
     printf("\n\n============================================================");
     printf("\n\nPerforming TestAllTruthTablesWithOneTrue test...\n\n");
 
-    globalTermsKept = 0;
-    globalTermsRemoved = 0;
+    ResetTermCounters();
 
     const unsigned long minVar = 1;
     const unsigned long maxVar = 12;
@@ -457,13 +431,12 @@ TestAllTruthTablesWithOneTrue(void)
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
     printf("\nNumber failures : %i", numFailures);
-    printf("\nTerms removed   : %i", globalTermsRemoved);
-    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\nTerms kept      : %i", GetNumTermsKept());
+    printf("\nTerms removed   : %i", GetNumTermsRemoved());
     printf("\n");
 }
 
-static void
-TestSomeRandomTruthTables(void)
+static void TestSomeRandomTruthTables(void)
 {
     const unsigned long numTests = 10;
     const unsigned long minVar = 13;
@@ -485,8 +458,7 @@ TestSomeRandomTruthTables(void)
     printf("\n\n============================================================");
     printf("\n\nPerforming TestSomeRandomTruthTables test...\n\n");
 
-    globalTermsKept = 0;
-    globalTermsRemoved = 0;
+    ResetTermCounters();
 
     for (iTest = 1; iTest <= numTests; iTest++)
     {
@@ -515,8 +487,8 @@ TestSomeRandomTruthTables(void)
     printf("\nNumber right    : %i", numRight);
     printf("\nNumber wrong    : %i", numWrong);
     printf("\nNumber failures : %i", numFailures);
-    printf("\nTerms removed   : %i", globalTermsRemoved);
-    printf("\nTerms kept      : %i", globalTermsKept);
+    printf("\nTerms kept      : %i", GetNumTermsKept());
+    printf("\nTerms removed   : %i", GetNumTermsRemoved());
     printf("\n");
 }
 
@@ -576,7 +548,7 @@ PrintEquation(
     const unsigned long dontCares[])
 {
     char *equation = NULL;
-    GenerateEquation(numVars, numTerms, terms, dontCares, NULL, &equation);
+    GenerateEquation(numVars, NULL, numTerms, terms, dontCares, &equation);
     if (equation)
     {
         printf("\n%s\n", equation);
