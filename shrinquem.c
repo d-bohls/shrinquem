@@ -2,20 +2,22 @@
 // Copyright (C) 2021 Damon Bohls <damonbohls@gmail.com>
 // MIT License: https://github.com/d-bohls/shrinquem/blob/main/LICENSE
 
-#define BITS_PER_BYTE (8)
-
 #include <stdlib.h>
 #include <string.h> // used for strlen
 #include "shrinquem.h"
+
+#define BITS_PER_BYTE (8)
+
+static const unsigned long MAX_NUM_VARIABLES = sizeof(long) * BITS_PER_BYTE;
 
 static unsigned long numTermsKept = 0;
 static unsigned long numTermsRemoved = 0;
 
 static void RemoveNonprimeImplicants(
     const unsigned long numVars,
-    unsigned long *numTerms,
-    unsigned long *terms[],
-    unsigned long *dontCares[]);
+    unsigned long* numTerms,
+    unsigned long* terms[],
+    unsigned long* dontCares[]);
 
 /*************************************************************************
 ReduceLogic
@@ -92,69 +94,35 @@ terms[1]     = b011 = 3   <~~ Var2 (bit position 1) and Var3 (bit position 0) bo
 extern enum shrinqStatus ReduceLogic(
     const unsigned long numVars,
     const triLogic truthTable[],
-    unsigned long *numTerms,
-    unsigned long *terms[],
-    unsigned long *dontCares[])
+    unsigned long* numTerms,
+    unsigned long* terms[],
+    unsigned long* dontCares[])
 {
     enum shrinqStatus status = STATUS_OKAY;
-    unsigned long maxVariables;
-    unsigned long maxTerms;
-    unsigned long sizeTruthtable;
-    unsigned long numMinterms;
-    unsigned long iInput;
-    unsigned long iTerm;
-    unsigned long iBitTest;
-    unsigned long iBitDC;
-    unsigned long bitMaskTest;
-    unsigned long bitMaskDC;
-    triLogic *resolved = NULL;
+    triLogic* resolved = NULL;
 
-    /*=============================================================
-        initialize and allocate
-    =============================================================*/
-
-    if (numTerms)
-    {
-        (*numTerms) = 0;
-    }
-
-    if (terms)
-    {
-        /* the caller should not have allocated any memory for the terms */
-        (*terms) = NULL;
-    }
-
-    if (dontCares)
-    {
-        /* the caller should not have allocated any memory for the dontCares */
-        (*dontCares) = NULL;
-    }
+    // initialize and allocate
 
     if (truthTable == NULL || numTerms == NULL || terms == NULL || dontCares == NULL)
     {
         status = STATUS_NULL_ARGUMENT;
         goto finalExit;
     }
-
-    if (numVars < 1)
+    else if (numVars < 1)
     {
         status = STATUS_TOO_FEW_VARIABLES;
         goto finalExit;
     }
-
-    maxVariables = sizeof(long) * BITS_PER_BYTE;
-
-    if (numVars > maxVariables)
+    else if (numVars > MAX_NUM_VARIABLES)
     {
         status = STATUS_TOO_MANY_VARIABLES;
         goto finalExit;
     }
 
-    sizeTruthtable = 1 << numVars; /* the truth table has 2^numVars elements */
-
-    /* count the non-zero minterms so I can estimate the maximum amount of memory required */
-    numMinterms = 0;
-    for (iInput = 0; iInput < sizeTruthtable; iInput++)
+    // count the non-zero minterms to estimate the maximum amount of memory required 
+    unsigned long numMinterms = 0;
+    unsigned long sizeTruthtable = 1 << numVars;
+    for (unsigned long iInput = 0; iInput < sizeTruthtable; iInput++)
     {
         if (truthTable[iInput] == LOGIC_TRUE)
         {
@@ -162,8 +130,11 @@ extern enum shrinqStatus ReduceLogic(
         }
     }
 
-    maxTerms = min(numMinterms, sizeTruthtable / 2);
+    unsigned long maxTerms = min(numMinterms, sizeTruthtable / 2);
 
+    (*numTerms) = 0;
+    (*terms) = NULL; // the caller should not have allocated any memory
+    (*dontCares) = NULL; // the caller should not have allocated any memory
     resolved = calloc(sizeTruthtable, sizeof(triLogic));
     (*terms) = malloc(maxTerms * sizeof(long));
     (*dontCares) = malloc(maxTerms * sizeof(long));
@@ -174,105 +145,100 @@ extern enum shrinqStatus ReduceLogic(
         goto finalExit;
     }
 
-    /*=============================================================
-       reduce the logic
-    =============================================================*/
-
-    /* loop through each entry in the truth table and derive the terms for the reduced logic */
-    for (iInput = 0; iInput < sizeTruthtable; iInput++)
+    // loop through each entry in the truth table and derive the terms for the reduced logic
+    for (unsigned long iInput = 0; iInput < sizeTruthtable; iInput++)
     {
         if ((truthTable[iInput] == LOGIC_TRUE) && !resolved[iInput])
         {
-            iTerm = (*numTerms);
+            unsigned long iTerm = (*numTerms);
             (*numTerms)++;
-            (*terms)[iTerm] = iInput; /* the term starts out equal to the minterm */
-            (*dontCares)[iTerm] = 0;  /* initially there are no "don't cares" */
-            /* loop through each bit to see if it can be replaced by a "don't care" */
-            for (iBitTest = 0; iBitTest < numVars; iBitTest++)
+            (*terms)[iTerm] = iInput; // the term starts out equal to the minterm 
+            (*dontCares)[iTerm] = 0;  // initially there are no "don't cares"
+
+            // loop through each bit to see if it can be replaced by a "don't care"
+            for (unsigned long iBitTest = 0; iBitTest < numVars; iBitTest++)
             {
-                bitMaskTest = 1 << iBitTest;
-                (*terms)[iTerm] ^= bitMaskTest; /* flip the test bit */
-                /* test all minterms associated with the term by checking all the "don't care" combinations */
-                /* start by clearing all "don't care" bits */
+                unsigned long bitMaskTest = 1 << iBitTest;
+                (*terms)[iTerm] ^= bitMaskTest;
+                // test all minterms associated with the term by checking all the "don't care" combinations
+                // start by clearing all "don't care" bits
                 (*terms)[iTerm] &= ~((*dontCares)[iTerm]);
 
                 while (1)
                 {
                     if (truthTable[(*terms)[iTerm]] == LOGIC_FALSE)
                     {
-                        /* we can't replace this variable with a don't care, so flip the bit back and exit */
+                        // we can't replace this variable with a don't care, so flip the bit back and exit
                         (*terms)[iTerm] ^= bitMaskTest;
                         break;
                     }
-                    /* get the next minterm to test */
+
+                    // get the next minterm to test
+                    unsigned long iBitDC;
                     for (iBitDC = 0; iBitDC < iBitTest; iBitDC++)
                     {
-                        bitMaskDC = 1 << iBitDC;
+                        unsigned long bitMaskDC = 1 << iBitDC;
                         if ((*dontCares)[iTerm] & bitMaskDC)
                         {
                             if ((*terms)[iTerm] & bitMaskDC)
                             {
-                                /* clear the bit and continue */
                                 (*terms)[iTerm] &= ~bitMaskDC;
                             }
                             else
                             {
-                                /* set the bit and exit */
                                 (*terms)[iTerm] |= bitMaskDC;
                                 break;
                             }
                         }
                     }
+
+                    // check to see if this bit/variable is a "don't care"
                     if (iBitDC == iBitTest)
                     {
-                        /* we can replace this variable with a "don't care" and exit */
                         (*dontCares)[iTerm] |= bitMaskTest;
                         break;
                     }
-                } /* end of the while loop */
+                }
             }
-            /* at this point, we have expanded the term to cover as many minterms as possible */
-            /* go through all minterms associated with this term to mark them as resolved */
-            /* start by clearing all "don't care" bits */
+
+            // At this point, we have expanded the term to cover as many minterms as possible.
+            // Now go through all minterms associated with this term to mark them as resolved.
+            // Start by clearing all "don't care" bits.
             (*terms)[iTerm] &= ~((*dontCares)[iTerm]);
 
             while (1)
             {
-                /* set this minterm as resolved */
                 resolved[(*terms)[iTerm]] = LOGIC_TRUE;
-                /* get the next minterm to set as resolved */
+
+                // get the next minterm to set as resolved
+                unsigned long iBitDC;
                 for (iBitDC = 0; iBitDC < numVars; iBitDC++)
                 {
-                    bitMaskDC = 1 << iBitDC;
+                    unsigned long bitMaskDC = 1 << iBitDC;
                     if ((*dontCares)[iTerm] & bitMaskDC)
                     {
                         if ((*terms)[iTerm] & bitMaskDC)
                         {
-                            /* clear the bit and continue */
                             (*terms)[iTerm] &= ~bitMaskDC;
                         }
                         else
                         {
-                            /* set the bit and exit */
                             (*terms)[iTerm] |= bitMaskDC;
                             break;
                         }
                     }
                 }
+
                 if (iBitDC == numVars)
                 {
-                    /* we're all done flagging resolved minterms */
                     break;
                 }
-            } /* end of while loop */
+            }
         }
     }
 
-    /*=============================================================
-      clean-up and free memory
-    =============================================================*/
-
-    /* free this memory first in case it helps the reallocs below */
+    // Now clean-up and free memory.
+    // Free this memory first in case it helps the reallocs below.
     if (resolved)
     {
         free(resolved);
@@ -324,7 +290,7 @@ finalExit:
 }
 
 /*************************************************************************
-GenerateEquation
+GenerateEquationString
 Purpose - generates a null-terminated string representation of the
   minimum sum-of-products equation generated by the ReduceLogic function
 Inputs:
@@ -337,13 +303,13 @@ Outputs:
   equation - null-terminated string representation of the minimum sum-of-products equation
 *************************************************************************/
 
-extern enum shrinqStatus GenerateEquation(
+extern enum shrinqStatus GenerateEquationString(
     const unsigned long numVars,
     char* varNames[],
     const unsigned long numTerms,
     const unsigned long terms[],
     const unsigned long dontCares[],
-    char *equation[])
+    char* equation[])
 {
     enum shrinqStatus retVal = STATUS_OKAY;
     unsigned long done = 0;
@@ -353,13 +319,9 @@ extern enum shrinqStatus GenerateEquation(
     unsigned long iTermPos;
     unsigned long iCharPos;
     unsigned long bitMask;
-    size_t *varNameSizes = NULL;
+    size_t* varNameSizes = NULL;
     size_t outputSize;
     unsigned long freeVarNames = 0;
-
-    /*=============================================================
-        generate the equation string
-    =============================================================*/
 
     if (equation == NULL)
     {
@@ -367,14 +329,14 @@ extern enum shrinqStatus GenerateEquation(
     }
     else
     {
-        /* the caller should not have allocated any memory for the equation */
+        // the caller should not have allocated any memory for the equation
         (*equation) = NULL;
     }
 
-    /* first check for the case where the equation is '0' */
+    // first check for the case where the equation is '0'
     if (numTerms <= 0)
     {
-        (*equation) = (char *)malloc(2 * sizeof(char));
+        (*equation) = (char*)malloc(2 * sizeof(char));
         if ((*equation) == 0)
             return STATUS_OUT_OF_MEMORY;
         (*equation)[0] = '0';
@@ -384,7 +346,7 @@ extern enum shrinqStatus GenerateEquation(
     else
     {
 
-        /* now check for a '1' (one term with all don't cares) */
+        // now check for a '1' (one term with all don't cares)
         if (numTerms == 1)
         {
             for (iVar = 0; iVar < numVars; iVar++)
@@ -397,7 +359,7 @@ extern enum shrinqStatus GenerateEquation(
             }
             if (iVar == numVars)
             {
-                (*equation) = (char *)malloc(2 * sizeof(char));
+                (*equation) = (char*)malloc(2 * sizeof(char));
                 if ((*equation) == 0)
                     return STATUS_OUT_OF_MEMORY;
                 (*equation)[0] = '1';
@@ -406,15 +368,15 @@ extern enum shrinqStatus GenerateEquation(
             }
         }
 
-        /* if the equation isn't '0' or '1' then build the string */
+        // if the equation isn't '0' or '1' then build the string
         if (done == 0)
         {
 
-            /* auto-name variables */
+            // auto-name variables if names were not provided
             if (varNames == NULL)
             {
                 freeVarNames = 1;
-                varNames = (char **)malloc(numVars * sizeof(char *));
+                varNames = (char**)malloc(numVars * sizeof(char*));
                 if (varNames == 0)
                     return STATUS_OUT_OF_MEMORY;
                 for (iVar = 0; iVar < numVars; iVar++)
@@ -426,7 +388,7 @@ extern enum shrinqStatus GenerateEquation(
             {
                 if (varNames[iVar] == NULL)
                 {
-                    varNames[iVar] = (char *)malloc(2 * sizeof(char));
+                    varNames[iVar] = (char*)malloc(2 * sizeof(char));
                     if (varNames[iVar] == 0)
                         return STATUS_OUT_OF_MEMORY;
                     (varNames[iVar])[0] = 'A' + (char)iVar;
@@ -434,8 +396,8 @@ extern enum shrinqStatus GenerateEquation(
                 }
             }
 
-            /* first calculate the size of the string names for the variables */
-            varNameSizes = (size_t *)malloc(sizeof(long *) * numVars);
+            // first calculate the size of the string names for the variables
+            varNameSizes = (size_t*)malloc(sizeof(long*) * numVars);
             if (varNameSizes == NULL)
                 return STATUS_OUT_OF_MEMORY;
             for (iVar = 0; iVar < numVars; iVar++)
@@ -443,7 +405,7 @@ extern enum shrinqStatus GenerateEquation(
                 varNameSizes[iVar] = strlen(varNames[iVar]);
             }
 
-            /* now run through the equation to determine what size the output string will be */
+            // now run through the equation to determine the length of the output string
             iTermPos = 0;
             iEquPos = 0;
             outputSize = 0;
@@ -465,20 +427,20 @@ extern enum shrinqStatus GenerateEquation(
                 }
                 if (iTerm < (numTerms - 1))
                 {
-                    outputSize += 3; /* account for the " + " */
+                    outputSize += 3; // account for the " + "
                 }
                 else
                 {
-                    outputSize++; /* account for the null terminator */
+                    outputSize++; // account for the null terminator
                 }
             }
 
-            /* allocate space for the equation */
-            (*equation) = (char *)malloc(outputSize * sizeof(char *));
+            // allocate space for the equation
+            (*equation) = (char*)malloc(outputSize * sizeof(char*));
             if ((*equation) == NULL)
                 return STATUS_OUT_OF_MEMORY;
 
-            /* use termTable and numTerms to generate equation */
+            // use termTable and numTerms to generate equation
             iTermPos = iEquPos = 0;
             for (iTerm = 0; iTerm < numTerms; iTerm++)
             {
@@ -487,12 +449,13 @@ extern enum shrinqStatus GenerateEquation(
                     bitMask = 1 << (numVars - iVar - 1);
                     if ((dontCares[iTerm] & bitMask) == 0)
                     {
-                        /* copy the variable name */
+                        // copy the variable name
                         for (iCharPos = 0; iCharPos < varNameSizes[iVar]; iCharPos++)
                         {
                             (*equation)[iEquPos++] = (varNames[iVar])[iCharPos];
                         }
-                        /* place the complement sign of false */
+
+                        // place the complement sign of false
                         if ((terms[iTerm] & bitMask) == 0)
                         {
                             (*equation)[iEquPos++] = '\'';
@@ -514,10 +477,6 @@ extern enum shrinqStatus GenerateEquation(
             done = 1;
         }
     }
-
-    /*=============================================================
-      clean-up and free memory
-    =============================================================*/
 
     if (freeVarNames)
     {
@@ -566,18 +525,18 @@ extern triLogic EvaluateSumOfProducts(
     const unsigned long dontCares[],
     const unsigned long input)
 {
-    /* clear out bits that might be set in the input which are beyond the number of variables we are evaluating */
+    // clear out bits that might be set in the input which are beyond the number of variables we are evaluating
     const unsigned long mask = (1 << numVars) - 1;
     unsigned long constrainedInput = input & mask;
 
     for (unsigned long iTerm = 0; iTerm < numTerms; iTerm++)
     {
-        /* one TRUE product term makes the whole sum-of-products TRUE */
+        // one TRUE product term makes the whole sum-of-products TRUE
         if ((constrainedInput | dontCares[iTerm]) == (terms[iTerm] | dontCares[iTerm]))
             return LOGIC_TRUE;
     }
 
-    /* no product terms were true, so the whole equation is false */
+    // no product terms were true, so the whole equation is false
     return LOGIC_FALSE;
 }
 

@@ -18,26 +18,27 @@ static const char* unitsGetTickCount = "milliseconds";
 
 #include <errno.h>
 #include <sys/time.h>
-static const char *unitsGetTickCount = "microseconds";
+static const char* unitsGetTickCount = "microseconds";
 
 static long GetTickCountForOS(void)
 {
     struct timeval tv;
     unsigned long rc;
 
-    rc = gettimeofday(&tv, (struct timezone *)0);
+    rc = gettimeofday(&tv, (struct timezone*)0);
     if (rc)
     {
         fprintf(stderr, "gettimeofday: %s\n", strerror(errno));
         abort();
     }
 
-    /* Convert to microseconds. */
+    // Convert to microseconds.
     return tv.tv_sec * 1000000L + tv.tv_usec;
 }
 
 #endif
 
+static void TestSimpleExample(void);
 static void TestOneSpecificTruthTable(void);
 static void TestOneRandomTruthTable(void);
 static void TestEquationGeneration(void);
@@ -46,14 +47,15 @@ static void TestAllTruthTablesWithOneFalse(void);
 static void TestAllTruthTablesWithOneTrue(void);
 static void TestSomeRandomTruthTables(void);
 static void PrintEquation(const unsigned long numVars, const unsigned long numTerms, const unsigned long terms[], const unsigned long dontCares[]);
-static void TestAllInputs(const unsigned long numVars, const triLogic truthTable[], const unsigned long numTerms, const unsigned long terms[], const unsigned long dontCares[], unsigned long *numRight, unsigned long *numWrong);
+static void TestAllInputs(const unsigned long numVars, const triLogic truthTable[], const unsigned long numTerms, const unsigned long terms[], const unsigned long dontCares[], unsigned long* numRight, unsigned long* numWrong);
 static long GetRandomLong(long min, long max);
 static void GetRandomBoolArray(unsigned long numElements, char boolArray[]);
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     srand((unsigned int)time(NULL));
 
+    TestSimpleExample();
     TestOneSpecificTruthTable();
     TestOneRandomTruthTable();
     TestEquationGeneration();
@@ -65,12 +67,33 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+static void TestSimpleExample(void)
+{
+    printf("\n\n============================================================");
+    printf("\n\nPerforming TestSimpleExample test...\n\n");
+
+    const numVars = 4;
+    const triLogic truthTable[16] = { 1,1,1,0,0,1,1,1,1,0,0,1,0,0,1,1, };
+    unsigned long numTerms;
+    unsigned long* terms = NULL;
+    unsigned long* dontCares = NULL;
+    char* equation = NULL;
+    ReduceLogic(numVars, truthTable, &numTerms, &terms, &dontCares);
+    GenerateEquationString(numVars, NULL, numTerms, terms, dontCares, &equation);
+    printf("%s", equation);
+    free(terms);
+    free(dontCares);
+    free(equation);
+
+    printf("\n");
+}
+
 static void TestOneSpecificTruthTable(void)
 {
     enum shrinqStatus retVal;
     unsigned long numTerms;
-    unsigned long *terms = NULL;
-    unsigned long *dontCares = NULL;
+    unsigned long* terms = NULL;
+    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -82,12 +105,12 @@ static void TestOneSpecificTruthTable(void)
 
     const numVars = 4;
     const triLogic truthTable[16] =
-        {
-            1,1,1,0,
-            0,1,1,1,
-            1,0,0,1,
-            0,0,1,1,
-        };
+    {
+        1,1,1,0,
+        0,1,1,1,
+        1,0,0,1,
+        0,0,1,1,
+    };
 
     unsigned long timer = GetTickCountForOS();
     retVal = ReduceLogic(numVars, truthTable, &numTerms, &terms, &dontCares);
@@ -118,8 +141,8 @@ static void TestOneRandomTruthTable(void)
 {
     enum shrinqStatus retVal;
     unsigned long numTerms;
-    unsigned long *terms = NULL;
-    unsigned long *dontCares = NULL;
+    unsigned long* terms = NULL;
+    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -132,7 +155,7 @@ static void TestOneRandomTruthTable(void)
     const unsigned long numVars = 5;
     unsigned long numOfPossibleInputs = 1 << numVars;
     size_t memSize = numOfPossibleInputs * sizeof(triLogic);
-    triLogic *truthTable = (triLogic *)malloc(memSize);
+    triLogic* truthTable = (triLogic*)malloc(memSize);
     GetRandomBoolArray(numOfPossibleInputs, truthTable);
 
     unsigned long timer = GetTickCountForOS();
@@ -164,8 +187,8 @@ static void TestEquationGeneration(void)
 {
     enum shrinqStatus retVal;
     unsigned long numTerms;
-    unsigned long *terms = NULL;
-    unsigned long *dontCares = NULL;
+    unsigned long* terms = NULL;
+    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -178,7 +201,7 @@ static void TestEquationGeneration(void)
     const unsigned long numVars = 4;
     unsigned long numOfPossibleInputs = 1 << numVars;
     size_t memSize = numOfPossibleInputs * sizeof(triLogic);
-    triLogic *truthTable = (triLogic *)malloc(memSize);
+    triLogic* truthTable = (triLogic*)malloc(memSize);
     GetRandomBoolArray(numOfPossibleInputs, truthTable);
 
     unsigned long timer = GetTickCountForOS();
@@ -190,16 +213,16 @@ static void TestEquationGeneration(void)
     {
         TestAllInputs(numVars, truthTable, numTerms, terms, dontCares, &numRight, &numWrong);
 
-        char *variableNames[] =
-            {
-                "Apple",
-                "Pear",
-                "Banana",
-                "Mango",
-            };
+        char* variableNames[] =
+        {
+            "Apple",
+            "Pear",
+            "Banana",
+            "Mango",
+        };
 
-        char *equation;
-        GenerateEquation(numVars, variableNames, numTerms, terms, dontCares, &equation);
+        char* equation;
+        GenerateEquationString(numVars, variableNames, numTerms, terms, dontCares, &equation);
         if (equation)
         {
             printf("\n%s\n", equation);
@@ -231,9 +254,9 @@ static void TestAllTruthTables(void)
     unsigned long iNumVars;
     unsigned long iInput;
     unsigned long numTerms;
-    triLogic *truthTable = NULL;
-    unsigned long *terms = NULL;
-    unsigned long *dontCares = NULL;
+    triLogic* truthTable = NULL;
+    unsigned long* terms = NULL;
+    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -262,7 +285,6 @@ static void TestAllTruthTables(void)
 
         while (1)
         {
-            /* reduce this truth table */
             retVal = ReduceLogic(iNumVars, truthTable, &numTerms, &terms, &dontCares);
             if (retVal == STATUS_OKAY)
             {
@@ -281,7 +303,7 @@ static void TestAllTruthTables(void)
                 numFailures++;
             }
 
-            /* set up the next truth table for testing */
+            // set up the next truth table to test
             for (iInput = 0; iInput < numOfPossibleInputs; iInput++)
             {
                 if (truthTable[iInput] == LOGIC_TRUE)
@@ -314,9 +336,9 @@ static void TestAllTruthTablesWithOneFalse(void)
 {
     enum shrinqStatus retVal;
     unsigned long numTerms;
-    triLogic *truthTable = NULL;
-    unsigned long *terms = NULL;
-    unsigned long *dontCares = NULL;
+    triLogic* truthTable = NULL;
+    unsigned long* terms = NULL;
+    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -377,9 +399,9 @@ static void TestAllTruthTablesWithOneTrue(void)
 {
     enum shrinqStatus retVal;
     unsigned long numTerms;
-    triLogic *truthTable = NULL;
-    unsigned long *terms = NULL;
-    unsigned long *dontCares = NULL;
+    triLogic* truthTable = NULL;
+    unsigned long* terms = NULL;
+    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -447,9 +469,9 @@ static void TestSomeRandomTruthTables(void)
     unsigned long numVars;
     unsigned long numOfPossibleInputs;
     unsigned long numTerms;
-    triLogic *truthTable = NULL;
-    unsigned long *terms = NULL;
-    unsigned long *dontCares = NULL;
+    triLogic* truthTable = NULL;
+    unsigned long* terms = NULL;
+    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -492,7 +514,7 @@ static void TestSomeRandomTruthTables(void)
     printf("\n");
 }
 
-/* returns a random integer between min and max inclusively */
+// returns a random integer between min and max inclusively
 static long
 GetRandomLong(
     long min,
@@ -519,8 +541,8 @@ TestAllInputs(
     const unsigned long numTerms,
     const unsigned long terms[],
     const unsigned long dontCares[],
-    unsigned long *numRight,
-    unsigned long *numWrong)
+    unsigned long* numRight,
+    unsigned long* numWrong)
 {
     triLogic result;
     unsigned long numOfPossibleInputs = 1 << numVars;
@@ -547,8 +569,8 @@ PrintEquation(
     const unsigned long terms[],
     const unsigned long dontCares[])
 {
-    char *equation = NULL;
-    GenerateEquation(numVars, NULL, numTerms, terms, dontCares, &equation);
+    char* equation = NULL;
+    GenerateEquationString(numVars, NULL, numTerms, terms, dontCares, &equation);
     if (equation)
     {
         printf("\n%s\n", equation);
