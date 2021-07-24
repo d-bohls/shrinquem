@@ -515,8 +515,7 @@ static void TestSomeRandomTruthTables(void)
 }
 
 // returns a random integer between min and max inclusively
-static long
-GetRandomLong(
+static long GetRandomLong(
     long min,
     long max)
 {
@@ -525,8 +524,7 @@ GetRandomLong(
     return result;
 }
 
-static void
-GetRandomBoolArray(
+static void GetRandomBoolArray(
     unsigned long numElements,
     char boolArray[])
 {
@@ -534,8 +532,7 @@ GetRandomBoolArray(
         boolArray[i] = (char)GetRandomLong(0, 1);
 }
 
-static void
-TestAllInputs(
+static void TestAllInputs(
     const unsigned long numVars,
     const triLogic truthTable[],
     const unsigned long numTerms,
@@ -562,8 +559,7 @@ TestAllInputs(
     }
 }
 
-static void
-PrintEquation(
+static void PrintEquation(
     const unsigned long numVars,
     const unsigned long numTerms,
     const unsigned long terms[],

@@ -13,6 +13,10 @@ static const unsigned long MAX_NUM_VARIABLES = sizeof(long) * BITS_PER_BYTE;
 static unsigned long numTermsKept = 0;
 static unsigned long numTermsRemoved = 0;
 
+static unsigned long EstimateMaxNumOfMinterms(
+    const unsigned long numVars,
+    const triLogic truthTable[]);
+
 static void RemoveNonprimeImplicants(
     const unsigned long numVars,
     unsigned long* numTerms,
@@ -106,43 +110,32 @@ extern enum shrinqStatus ReduceLogic(
     if (truthTable == NULL || numTerms == NULL || terms == NULL || dontCares == NULL)
     {
         status = STATUS_NULL_ARGUMENT;
-        goto finalExit;
+        goto cleanupAndExit;
     }
     else if (numVars < 1)
     {
         status = STATUS_TOO_FEW_VARIABLES;
-        goto finalExit;
+        goto cleanupAndExit;
     }
     else if (numVars > MAX_NUM_VARIABLES)
     {
         status = STATUS_TOO_MANY_VARIABLES;
-        goto finalExit;
+        goto cleanupAndExit;
     }
 
-    // count the non-zero minterms to estimate the maximum amount of memory required 
-    unsigned long numMinterms = 0;
     unsigned long sizeTruthtable = 1 << numVars;
-    for (unsigned long iInput = 0; iInput < sizeTruthtable; iInput++)
-    {
-        if (truthTable[iInput] == LOGIC_TRUE)
-        {
-            numMinterms++;
-        }
-    }
-
-    unsigned long maxTerms = min(numMinterms, sizeTruthtable / 2);
-
+    unsigned long maxNumOfMinterms = EstimateMaxNumOfMinterms(numVars, truthTable);
     (*numTerms) = 0;
     (*terms) = NULL; // the caller should not have allocated any memory
     (*dontCares) = NULL; // the caller should not have allocated any memory
     resolved = calloc(sizeTruthtable, sizeof(triLogic));
-    (*terms) = malloc(maxTerms * sizeof(long));
-    (*dontCares) = malloc(maxTerms * sizeof(long));
+    (*terms) = malloc(maxNumOfMinterms * sizeof(long));
+    (*dontCares) = malloc(maxNumOfMinterms * sizeof(long));
 
     if (resolved == NULL || terms == NULL || dontCares == NULL)
     {
         status = STATUS_OUT_OF_MEMORY;
-        goto finalExit;
+        goto cleanupAndExit;
     }
 
     // loop through each entry in the truth table and derive the terms for the reduced logic
@@ -237,24 +230,7 @@ extern enum shrinqStatus ReduceLogic(
         }
     }
 
-    // Now clean-up and free memory.
-    // Free this memory first in case it helps the reallocs below.
-    if (resolved)
-    {
-        free(resolved);
-        resolved = NULL;
-    }
-
-    (*terms) = realloc((*terms), (*numTerms) * sizeof(long));
-    (*dontCares) = realloc((*dontCares), (*numTerms) * sizeof(long));
-
-    if (terms == NULL || dontCares == NULL)
-    {
-        status = STATUS_OUT_OF_MEMORY;
-        goto finalExit;
-    }
-
-finalExit:
+cleanupAndExit:
 
     if (resolved)
     {
@@ -264,25 +240,31 @@ finalExit:
 
     if (status == STATUS_OKAY)
     {
+        // we're just making these buffers smaller so it should never fail, but ignore the case that it does
+        void* p;
+        p = realloc(*terms, (*numTerms) * sizeof(long));
+        *terms = (p || *numTerms == 0) ? p : *terms;
+        p = realloc(*dontCares, (*numTerms) * sizeof(long));
+        *dontCares = (p || *numTerms == 0) ? p : *dontCares;
+
         RemoveNonprimeImplicants(numVars, numTerms, terms, dontCares);
     }
-    else
+
+    if (status != STATUS_OKAY)
     {
         if (numTerms)
-        {
-            (*numTerms) = 0;
-        }
+            *numTerms = 0;
 
         if (terms && *terms)
         {
             free(*terms);
-            (*terms) = NULL;
+            *terms = NULL;
         }
 
         if (dontCares && *dontCares)
         {
             free(*dontCares);
-            (*dontCares) = NULL;
+            *dontCares = NULL;
         }
     }
 
@@ -339,6 +321,7 @@ extern enum shrinqStatus GenerateEquationString(
         (*equation) = (char*)malloc(2 * sizeof(char));
         if ((*equation) == 0)
             return STATUS_OUT_OF_MEMORY;
+
         (*equation)[0] = '0';
         (*equation)[1] = 0;
         done = 1;
@@ -357,6 +340,7 @@ extern enum shrinqStatus GenerateEquationString(
                     break;
                 }
             }
+
             if (iVar == numVars)
             {
                 (*equation) = (char*)malloc(2 * sizeof(char));
@@ -379,6 +363,7 @@ extern enum shrinqStatus GenerateEquationString(
                 varNames = (char**)malloc(numVars * sizeof(char*));
                 if (varNames == 0)
                     return STATUS_OUT_OF_MEMORY;
+
                 for (iVar = 0; iVar < numVars; iVar++)
                 {
                     varNames[iVar] = NULL;
@@ -400,6 +385,7 @@ extern enum shrinqStatus GenerateEquationString(
             varNameSizes = (size_t*)malloc(sizeof(long*) * numVars);
             if (varNameSizes == NULL)
                 return STATUS_OUT_OF_MEMORY;
+
             for (iVar = 0; iVar < numVars; iVar++)
             {
                 varNameSizes[iVar] = strlen(varNames[iVar]);
@@ -425,6 +411,7 @@ extern enum shrinqStatus GenerateEquationString(
 
                     iTermPos++;
                 }
+
                 if (iTerm < (numTerms - 1))
                 {
                     outputSize += 3; // account for the " + "
@@ -463,6 +450,7 @@ extern enum shrinqStatus GenerateEquationString(
                     }
                     iTermPos++;
                 }
+
                 if (iTerm < (numTerms - 1))
                 {
                     (*equation)[iEquPos++] = ' ';
@@ -474,6 +462,7 @@ extern enum shrinqStatus GenerateEquationString(
                     (*equation)[iEquPos++] = 0;
                 }
             }
+
             done = 1;
         }
     }
@@ -488,6 +477,7 @@ extern enum shrinqStatus GenerateEquationString(
                 varNames[iVar] = NULL;
             }
         }
+
         if (varNames)
         {
             free(varNames);
@@ -526,8 +516,8 @@ extern triLogic EvaluateSumOfProducts(
     const unsigned long input)
 {
     // clear out bits that might be set in the input which are beyond the number of variables we are evaluating
-    const unsigned long mask = (1 << numVars) - 1;
-    unsigned long constrainedInput = input & mask;
+    const unsigned long inputMask = (1 << numVars) - 1;
+    unsigned long constrainedInput = input & inputMask;
 
     for (unsigned long iTerm = 0; iTerm < numTerms; iTerm++)
     {
@@ -554,6 +544,29 @@ extern unsigned long GetNumTermsKept()
 extern unsigned long GetNumTermsRemoved()
 {
     return numTermsRemoved;
+}
+
+
+static unsigned long EstimateMaxNumOfMinterms(
+    const unsigned long numVars,
+    const triLogic truthTable[])
+{
+    // the maximum possible number of minterms is when the truth table has alternating zeros and ones, like a checkerboard.
+    unsigned long sizeTruthtable = 1 << numVars;
+    unsigned long maximumPossibleNumOfMinterms = sizeTruthtable / 2;
+
+    // We know the final equation will have less than or equal to the non-zero minterms in the truth table.
+    // Count them up so we can see if this is less.
+    unsigned long numTrueMinterms = 0;
+    for (unsigned long iInput = 0; iInput < sizeTruthtable; iInput++)
+    {
+        if (truthTable[iInput] == LOGIC_TRUE)
+        {
+            numTrueMinterms++;
+        }
+    }
+
+    return min(maximumPossibleNumOfMinterms, numTrueMinterms);
 }
 
 /*************************************************************************
@@ -715,7 +728,11 @@ static void RemoveNonprimeImplicants(
 
     if ((*numTerms) != numOldTerms)
     {
-        *terms = realloc(*terms, (*numTerms) * sizeof(long));
-        *dontCares = realloc(*dontCares, (*numTerms) * sizeof(long));
+        // we're just making these buffers smaller so it should never fail, but ignore the case that it does
+        void* p;
+        p = realloc(*terms, (*numTerms) * sizeof(long));
+        *terms = (p || *numTerms == 0) ? p : *terms;
+        p = realloc(*dontCares, (*numTerms) * sizeof(long));
+        *dontCares = (p || *numTerms == 0) ? p : *dontCares;
     }
 }
