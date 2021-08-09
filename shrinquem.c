@@ -18,21 +18,35 @@ static unsigned long EstimateMaxNumOfMinterms(
     const triLogic truthTable[]);
 
 static void RemoveNonprimeImplicants(
-    const unsigned long numVars,
-    unsigned long* numTerms,
-    unsigned long* terms[],
-    unsigned long* dontCares[]);
+    SumOfProducts* sumOfProducts);
+
+void FinalizeSumOfProducts(SumOfProducts* sumOfProducts)
+{
+    sumOfProducts->numVars = 0;
+    sumOfProducts->numTerms = 0;
+
+    if (sumOfProducts->terms)
+    {
+        free(sumOfProducts->terms);
+        sumOfProducts->terms = NULL;
+    }
+
+    if (sumOfProducts->dontCares)
+    {
+        free(sumOfProducts->dontCares);
+        sumOfProducts->dontCares = NULL;
+    }
+
+    if (sumOfProducts->equation)
+    {
+        free(sumOfProducts->equation);
+        sumOfProducts->equation = NULL;
+    }
+}
 
 /*************************************************************************
 ReduceLogic
 Purpose - generates an array representation of the minimum sum-of-products equation
-Inputs
-  numVars - number of variables, size of truthTable is 2^numVars
-  truthTable - array of outputs for each minterm
-Outputs:
-  numTerms - number of rows in the 2D array termTable
-  terms - each long represents a term, where each bit is a variable
-  dontCares - each long represents a term, where each bit is a "don't care" for a variable
 
 Data is formatted as follows:
 
@@ -95,44 +109,41 @@ terms[1]     = b011 = 3   <~~ Var2 (bit position 1) and Var3 (bit position 0) bo
 
 *************************************************************************/
 
-extern enum shrinqStatus ReduceLogic(
-    const unsigned long numVars,
+enum shrinqStatus ReduceLogic(
     const triLogic truthTable[],
-    unsigned long* numTerms,
-    unsigned long* terms[],
-    unsigned long* dontCares[])
+    SumOfProducts* sumOfProducts)
 {
     enum shrinqStatus status = STATUS_OKAY;
     triLogic* resolved = NULL;
 
     // initialize and allocate
 
-    if (truthTable == NULL || numTerms == NULL || terms == NULL || dontCares == NULL)
+    if (truthTable == NULL)
     {
         status = STATUS_NULL_ARGUMENT;
         goto cleanupAndExit;
     }
-    else if (numVars < 1)
+    else if (sumOfProducts->numVars < 1)
     {
         status = STATUS_TOO_FEW_VARIABLES;
         goto cleanupAndExit;
     }
-    else if (numVars > MAX_NUM_VARIABLES)
+    else if (sumOfProducts->numVars > MAX_NUM_VARIABLES)
     {
         status = STATUS_TOO_MANY_VARIABLES;
         goto cleanupAndExit;
     }
 
-    unsigned long sizeTruthtable = 1 << numVars;
-    unsigned long maxNumOfMinterms = EstimateMaxNumOfMinterms(numVars, truthTable);
-    (*numTerms) = 0;
-    (*terms) = NULL; // the caller should not have allocated any memory
-    (*dontCares) = NULL; // the caller should not have allocated any memory
+    unsigned long sizeTruthtable = 1 << sumOfProducts->numVars;
+    unsigned long maxNumOfMinterms = EstimateMaxNumOfMinterms(sumOfProducts->numVars, truthTable);
+    sumOfProducts->numTerms = 0;
+    sumOfProducts->terms = NULL; // the caller should not have allocated any memory
+    sumOfProducts->dontCares = NULL; // the caller should not have allocated any memory
     resolved = calloc(sizeTruthtable, sizeof(triLogic));
-    (*terms) = malloc(maxNumOfMinterms * sizeof(long));
-    (*dontCares) = malloc(maxNumOfMinterms * sizeof(long));
+    sumOfProducts->terms = malloc(maxNumOfMinterms * sizeof(long));
+    sumOfProducts->dontCares = malloc(maxNumOfMinterms * sizeof(long));
 
-    if (resolved == NULL || terms == NULL || dontCares == NULL)
+    if (resolved == NULL || sumOfProducts->terms == NULL || sumOfProducts->dontCares == NULL)
     {
         status = STATUS_OUT_OF_MEMORY;
         goto cleanupAndExit;
@@ -143,26 +154,26 @@ extern enum shrinqStatus ReduceLogic(
     {
         if ((truthTable[iInput] == LOGIC_TRUE) && !resolved[iInput])
         {
-            unsigned long iTerm = (*numTerms);
-            (*numTerms)++;
-            (*terms)[iTerm] = iInput; // the term starts out equal to the minterm 
-            (*dontCares)[iTerm] = 0;  // initially there are no "don't cares"
+            unsigned long iTerm = sumOfProducts->numTerms;
+            sumOfProducts->numTerms++;
+            sumOfProducts->terms[iTerm] = iInput; // the term starts out equal to the minterm 
+            sumOfProducts->dontCares[iTerm] = 0;  // initially there are no "don't cares"
 
             // loop through each bit to see if it can be replaced by a "don't care"
-            for (unsigned long iBitTest = 0; iBitTest < numVars; iBitTest++)
+            for (unsigned long iBitTest = 0; iBitTest < sumOfProducts->numVars; iBitTest++)
             {
                 unsigned long bitMaskTest = 1 << iBitTest;
-                (*terms)[iTerm] ^= bitMaskTest;
+                sumOfProducts->terms[iTerm] ^= bitMaskTest;
                 // test all minterms associated with the term by checking all the "don't care" combinations
                 // start by clearing all "don't care" bits
-                (*terms)[iTerm] &= ~((*dontCares)[iTerm]);
+                sumOfProducts->terms[iTerm] &= ~(sumOfProducts->dontCares[iTerm]);
 
                 while (1)
                 {
-                    if (truthTable[(*terms)[iTerm]] == LOGIC_FALSE)
+                    if (truthTable[sumOfProducts->terms[iTerm]] == LOGIC_FALSE)
                     {
                         // we can't replace this variable with a don't care, so flip the bit back and exit
-                        (*terms)[iTerm] ^= bitMaskTest;
+                        sumOfProducts->terms[iTerm] ^= bitMaskTest;
                         break;
                     }
 
@@ -171,15 +182,15 @@ extern enum shrinqStatus ReduceLogic(
                     for (iBitDC = 0; iBitDC < iBitTest; iBitDC++)
                     {
                         unsigned long bitMaskDC = 1 << iBitDC;
-                        if ((*dontCares)[iTerm] & bitMaskDC)
+                        if (sumOfProducts->dontCares[iTerm] & bitMaskDC)
                         {
-                            if ((*terms)[iTerm] & bitMaskDC)
+                            if (sumOfProducts->terms[iTerm] & bitMaskDC)
                             {
-                                (*terms)[iTerm] &= ~bitMaskDC;
+                                sumOfProducts->terms[iTerm] &= ~bitMaskDC;
                             }
                             else
                             {
-                                (*terms)[iTerm] |= bitMaskDC;
+                                sumOfProducts->terms[iTerm] |= bitMaskDC;
                                 break;
                             }
                         }
@@ -188,7 +199,7 @@ extern enum shrinqStatus ReduceLogic(
                     // check to see if this bit/variable is a "don't care"
                     if (iBitDC == iBitTest)
                     {
-                        (*dontCares)[iTerm] |= bitMaskTest;
+                        sumOfProducts->dontCares[iTerm] |= bitMaskTest;
                         break;
                     }
                 }
@@ -197,32 +208,32 @@ extern enum shrinqStatus ReduceLogic(
             // At this point, we have expanded the term to cover as many minterms as possible.
             // Now go through all minterms associated with this term to mark them as resolved.
             // Start by clearing all "don't care" bits.
-            (*terms)[iTerm] &= ~((*dontCares)[iTerm]);
+            sumOfProducts->terms[iTerm] &= ~(sumOfProducts->dontCares[iTerm]);
 
             while (1)
             {
-                resolved[(*terms)[iTerm]] = LOGIC_TRUE;
+                resolved[sumOfProducts->terms[iTerm]] = LOGIC_TRUE;
 
                 // get the next minterm to set as resolved
                 unsigned long iBitDC;
-                for (iBitDC = 0; iBitDC < numVars; iBitDC++)
+                for (iBitDC = 0; iBitDC < sumOfProducts->numVars; iBitDC++)
                 {
                     unsigned long bitMaskDC = 1 << iBitDC;
-                    if ((*dontCares)[iTerm] & bitMaskDC)
+                    if (sumOfProducts->dontCares[iTerm] & bitMaskDC)
                     {
-                        if ((*terms)[iTerm] & bitMaskDC)
+                        if (sumOfProducts->terms[iTerm] & bitMaskDC)
                         {
-                            (*terms)[iTerm] &= ~bitMaskDC;
+                            sumOfProducts->terms[iTerm] &= ~bitMaskDC;
                         }
                         else
                         {
-                            (*terms)[iTerm] |= bitMaskDC;
+                            sumOfProducts->terms[iTerm] |= bitMaskDC;
                             break;
                         }
                     }
                 }
 
-                if (iBitDC == numVars)
+                if (iBitDC == sumOfProducts->numVars)
                 {
                     break;
                 }
@@ -242,29 +253,29 @@ cleanupAndExit:
     {
         // we're just making these buffers smaller so it should never fail, but ignore the case that it does
         void* p;
-        p = realloc(*terms, (*numTerms) * sizeof(long));
-        *terms = (p || *numTerms == 0) ? p : *terms;
-        p = realloc(*dontCares, (*numTerms) * sizeof(long));
-        *dontCares = (p || *numTerms == 0) ? p : *dontCares;
+        p = realloc(sumOfProducts->terms, sumOfProducts->numTerms * sizeof(long));
+        sumOfProducts->terms = (p || sumOfProducts->numTerms == 0) ? p : sumOfProducts->terms;
+        p = realloc(sumOfProducts->dontCares, sumOfProducts->numTerms * sizeof(long));
+        sumOfProducts->dontCares = (p || sumOfProducts->numTerms == 0) ? p : sumOfProducts->dontCares;
 
-        RemoveNonprimeImplicants(numVars, numTerms, terms, dontCares);
+        RemoveNonprimeImplicants(sumOfProducts);
     }
 
     if (status != STATUS_OKAY)
     {
-        if (numTerms)
-            *numTerms = 0;
+        if (sumOfProducts->numTerms)
+            sumOfProducts->numTerms = 0;
 
-        if (terms && *terms)
+        if (sumOfProducts->terms)
         {
-            free(*terms);
-            *terms = NULL;
+            free(sumOfProducts->terms);
+            sumOfProducts->terms = NULL;
         }
 
-        if (dontCares && *dontCares)
+        if (sumOfProducts->dontCares)
         {
-            free(*dontCares);
-            *dontCares = NULL;
+            free(sumOfProducts->dontCares);
+            sumOfProducts->dontCares = NULL;
         }
     }
 
@@ -275,23 +286,11 @@ cleanupAndExit:
 GenerateEquationString
 Purpose - generates a null-terminated string representation of the
   minimum sum-of-products equation generated by the ReduceLogic function
-Inputs:
-  numVars - number of variables
-  varNames - string array naming each variable
-  numTerms - use the value returned by the ReduceLogic function
-  terms - use the value returned by the ReduceLogic function
-  dontCares - use the value returned by the ReduceLogic function
-Outputs:
-  equation - null-terminated string representation of the minimum sum-of-products equation
 *************************************************************************/
 
-extern enum shrinqStatus GenerateEquationString(
-    const unsigned long numVars,
-    char* varNames[],
-    const unsigned long numTerms,
-    const unsigned long terms[],
-    const unsigned long dontCares[],
-    char* equation[])
+enum shrinqStatus GenerateEquationString(
+    SumOfProducts* sumOfProducts,
+    const char** const varNames)
 {
     enum shrinqStatus retVal = STATUS_OKAY;
     unsigned long done = 0;
@@ -301,53 +300,47 @@ extern enum shrinqStatus GenerateEquationString(
     unsigned long iTermPos;
     unsigned long iCharPos;
     unsigned long bitMask;
-    size_t* varNameSizes = NULL;
     size_t outputSize;
-    unsigned long freeVarNames = 0;
+    char** varNamesAuto = NULL;
+    const char** varNamesToUse = NULL;
+    size_t* varNameSizes = NULL;
 
-    if (equation == NULL)
-    {
-        return STATUS_NULL_ARGUMENT;
-    }
-    else
-    {
-        // the caller should not have allocated any memory for the equation
-        (*equation) = NULL;
-    }
+    // the caller should not have allocated any memory for the equation
+    sumOfProducts->equation = NULL;
 
     // first check for the case where the equation is '0'
-    if (numTerms <= 0)
+    if (sumOfProducts->numTerms <= 0)
     {
-        (*equation) = (char*)malloc(2 * sizeof(char));
-        if ((*equation) == 0)
+        sumOfProducts->equation = (char*)malloc(2 * sizeof(char));
+        if (sumOfProducts->equation == NULL)
             return STATUS_OUT_OF_MEMORY;
 
-        (*equation)[0] = '0';
-        (*equation)[1] = 0;
+        sumOfProducts->equation[0] = '0';
+        sumOfProducts->equation[1] = 0;
         done = 1;
     }
     else
     {
 
         // now check for a '1' (one term with all don't cares)
-        if (numTerms == 1)
+        if (sumOfProducts->numTerms == 1)
         {
-            for (iVar = 0; iVar < numVars; iVar++)
+            for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
             {
                 bitMask = 1 << iVar;
-                if ((dontCares[0] & bitMask) == 0)
+                if ((sumOfProducts->dontCares[0] & bitMask) == 0)
                 {
                     break;
                 }
             }
 
-            if (iVar == numVars)
+            if (iVar == sumOfProducts->numVars)
             {
-                (*equation) = (char*)malloc(2 * sizeof(char));
-                if ((*equation) == 0)
+                sumOfProducts->equation = (char*)malloc(2 * sizeof(char));
+                if (sumOfProducts->equation == NULL)
                     return STATUS_OUT_OF_MEMORY;
-                (*equation)[0] = '1';
-                (*equation)[1] = 0;
+                sumOfProducts->equation[0] = '1';
+                sumOfProducts->equation[1] = 0;
                 done = 1;
             }
         }
@@ -357,53 +350,58 @@ extern enum shrinqStatus GenerateEquationString(
         {
 
             // auto-name variables if names were not provided
-            if (varNames == NULL)
+            if (varNames != NULL)
             {
-                freeVarNames = 1;
-                varNames = (char**)malloc(numVars * sizeof(char*));
-                if (varNames == 0)
+                varNamesToUse = varNames;
+            }
+            else
+            {
+                varNamesAuto = (char**)malloc(sumOfProducts->numVars * sizeof(char*));
+                varNamesToUse = varNamesAuto;
+                if (varNamesAuto == NULL)
                     return STATUS_OUT_OF_MEMORY;
 
-                for (iVar = 0; iVar < numVars; iVar++)
+                for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
                 {
-                    varNames[iVar] = NULL;
+                    varNamesAuto[iVar] = NULL;
                 }
-            }
-            for (iVar = 0; iVar < numVars; iVar++)
-            {
-                if (varNames[iVar] == NULL)
+
+                for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
                 {
-                    varNames[iVar] = (char*)malloc(2 * sizeof(char));
-                    if (varNames[iVar] == 0)
-                        return STATUS_OUT_OF_MEMORY;
-                    (varNames[iVar])[0] = 'A' + (char)iVar;
-                    (varNames[iVar])[1] = 0;
+                    if (varNamesAuto[iVar] == NULL)
+                    {
+                        varNamesAuto[iVar] = (char*)malloc(2 * sizeof(char));
+                        if (varNamesAuto[iVar] == 0)
+                            return STATUS_OUT_OF_MEMORY;
+                        (varNamesAuto[iVar])[0] = 'A' + (char)iVar;
+                        (varNamesAuto[iVar])[1] = 0;
+                    }
                 }
             }
 
             // first calculate the size of the string names for the variables
-            varNameSizes = (size_t*)malloc(sizeof(long*) * numVars);
+            varNameSizes = (size_t*)malloc(sizeof(long*) * sumOfProducts->numVars);
             if (varNameSizes == NULL)
                 return STATUS_OUT_OF_MEMORY;
 
-            for (iVar = 0; iVar < numVars; iVar++)
+            for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
             {
-                varNameSizes[iVar] = strlen(varNames[iVar]);
+                varNameSizes[iVar] = strlen(varNamesToUse[iVar]);
             }
 
             // now run through the equation to determine the length of the output string
             iTermPos = 0;
             iEquPos = 0;
             outputSize = 0;
-            for (iTerm = 0; iTerm < numTerms; iTerm++)
+            for (iTerm = 0; iTerm < sumOfProducts->numTerms; iTerm++)
             {
-                for (iVar = 0; iVar < numVars; iVar++)
+                for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
                 {
-                    bitMask = 1 << (numVars - iVar - 1);
-                    if ((dontCares[iTerm] & bitMask) == 0)
+                    bitMask = 1 << (sumOfProducts->numVars - iVar - 1);
+                    if ((sumOfProducts->dontCares[iTerm] & bitMask) == 0)
                     {
                         outputSize += varNameSizes[iVar];
-                        if ((terms[iTerm] & bitMask) == 0)
+                        if ((sumOfProducts->terms[iTerm] & bitMask) == 0)
                         {
                             outputSize++;
                         }
@@ -412,7 +410,7 @@ extern enum shrinqStatus GenerateEquationString(
                     iTermPos++;
                 }
 
-                if (iTerm < (numTerms - 1))
+                if (iTerm < (sumOfProducts->numTerms - 1))
                 {
                     outputSize += 3; // account for the " + "
                 }
@@ -423,43 +421,43 @@ extern enum shrinqStatus GenerateEquationString(
             }
 
             // allocate space for the equation
-            (*equation) = (char*)malloc(outputSize * sizeof(char*));
-            if ((*equation) == NULL)
+            sumOfProducts->equation = (char*)malloc(outputSize * sizeof(char*));
+            if (sumOfProducts->equation == NULL)
                 return STATUS_OUT_OF_MEMORY;
 
             // use termTable and numTerms to generate equation
             iTermPos = iEquPos = 0;
-            for (iTerm = 0; iTerm < numTerms; iTerm++)
+            for (iTerm = 0; iTerm < sumOfProducts->numTerms; iTerm++)
             {
-                for (iVar = 0; iVar < numVars; iVar++)
+                for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
                 {
-                    bitMask = 1 << (numVars - iVar - 1);
-                    if ((dontCares[iTerm] & bitMask) == 0)
+                    bitMask = 1 << (sumOfProducts->numVars - iVar - 1);
+                    if ((sumOfProducts->dontCares[iTerm] & bitMask) == 0)
                     {
                         // copy the variable name
                         for (iCharPos = 0; iCharPos < varNameSizes[iVar]; iCharPos++)
                         {
-                            (*equation)[iEquPos++] = (varNames[iVar])[iCharPos];
+                            sumOfProducts->equation[iEquPos++] = (varNamesToUse[iVar])[iCharPos];
                         }
 
                         // place the complement sign of false
-                        if ((terms[iTerm] & bitMask) == 0)
+                        if ((sumOfProducts->terms[iTerm] & bitMask) == 0)
                         {
-                            (*equation)[iEquPos++] = '\'';
+                            sumOfProducts->equation[iEquPos++] = '\'';
                         }
                     }
                     iTermPos++;
                 }
 
-                if (iTerm < (numTerms - 1))
+                if (iTerm < (sumOfProducts->numTerms - 1))
                 {
-                    (*equation)[iEquPos++] = ' ';
-                    (*equation)[iEquPos++] = '+';
-                    (*equation)[iEquPos++] = ' ';
+                    sumOfProducts->equation[iEquPos++] = ' ';
+                    sumOfProducts->equation[iEquPos++] = '+';
+                    sumOfProducts->equation[iEquPos++] = ' ';
                 }
                 else
                 {
-                    (*equation)[iEquPos++] = 0;
+                    sumOfProducts->equation[iEquPos++] = 0;
                 }
             }
 
@@ -467,21 +465,21 @@ extern enum shrinqStatus GenerateEquationString(
         }
     }
 
-    if (freeVarNames)
+    if (varNamesAuto != NULL)
     {
-        for (iVar = 0; iVar < numVars; iVar++)
+        for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
         {
-            if (varNames[iVar] != NULL)
+            if (varNamesAuto[iVar] != NULL)
             {
-                free(varNames[iVar]);
-                varNames[iVar] = NULL;
+                free(varNamesAuto[iVar]);
+                varNamesAuto[iVar] = NULL;
             }
         }
 
-        if (varNames)
+        if (varNamesAuto)
         {
-            free(varNames);
-            varNames = NULL;
+            free(varNamesAuto);
+            varNamesAuto = NULL;
         }
     }
 
@@ -498,31 +496,20 @@ extern enum shrinqStatus GenerateEquationString(
 EvaluateSumOfProducts
 Purpose - evaluates the sum-of-products produced by ReduceLogic given
           a certain set of boolean inputs.
-Inputs:
-  numVars  - number of variables/inputs
-  numTerms - number of terms in the sum-of-products, returned by ReduceLogic
-  terms    - terms in the sum-of-products, returned by ReduceLogic
-  dontCars - dontCares in the sum-of-products, returned by ReduceLogic
-  input    - represents a bit array of the inputs
-Outputs:
-  the boolean result of the sum-of-products evaluated for the inputs
 *************************************************************************/
 
-extern triLogic EvaluateSumOfProducts(
-    const unsigned long numVars,
-    const unsigned long numTerms,
-    const unsigned long terms[],
-    const unsigned long dontCares[],
+triLogic EvaluateSumOfProducts(
+    const SumOfProducts sumOfProducts,
     const unsigned long input)
 {
     // clear out bits that might be set in the input which are beyond the number of variables we are evaluating
-    const unsigned long inputMask = (1 << numVars) - 1;
+    const unsigned long inputMask = (1 << sumOfProducts.numVars) - 1;
     unsigned long constrainedInput = input & inputMask;
 
-    for (unsigned long iTerm = 0; iTerm < numTerms; iTerm++)
+    for (unsigned long iTerm = 0; iTerm < sumOfProducts.numTerms; iTerm++)
     {
         // one TRUE product term makes the whole sum-of-products TRUE
-        if ((constrainedInput | dontCares[iTerm]) == (terms[iTerm] | dontCares[iTerm]))
+        if ((constrainedInput | sumOfProducts.dontCares[iTerm]) == (sumOfProducts.terms[iTerm] | sumOfProducts.dontCares[iTerm]))
             return LOGIC_TRUE;
     }
 
@@ -530,18 +517,18 @@ extern triLogic EvaluateSumOfProducts(
     return LOGIC_FALSE;
 }
 
-extern void ResetTermCounters()
+void ResetTermCounters()
 {
     numTermsKept = 0;
     numTermsRemoved = 0;
 }
 
-extern unsigned long GetNumTermsKept()
+unsigned long GetNumTermsKept()
 {
     return numTermsKept;
 }
 
-extern unsigned long GetNumTermsRemoved()
+unsigned long GetNumTermsRemoved()
 {
     return numTermsRemoved;
 }
@@ -572,20 +559,10 @@ static unsigned long EstimateMaxNumOfMinterms(
 /*************************************************************************
 RemoveNonprimeImplicants
 Purpose - removes terms which are non-prime implicants.
-Inputs:
-  numVars - number of variables/inputs
-  numTerms - number of terms in the sum-of-products, returned by ReduceLogic
-  terms - terms in the sum-of-products, returned by ReduceLogic
-  dontCares - dontCares in the sum-of-products, returned by ReduceLogic
-Outputs:
-  numTerms, terms, and dontCares are modified directly when terms can be removed
 *************************************************************************/
 
 static void RemoveNonprimeImplicants(
-    const unsigned long numVars,
-    unsigned long* numTerms,
-    unsigned long* terms[],
-    unsigned long* dontCares[])
+    SumOfProducts* sumOfProducts)
 {
     unsigned long* refCntTable;
     unsigned long sizeTruthtable;
@@ -595,9 +572,9 @@ static void RemoveNonprimeImplicants(
     unsigned long bitMaskDC;
     char isPrime;
 
-    numOldTerms = (*numTerms);
+    numOldTerms = sumOfProducts->numTerms;
 
-    sizeTruthtable = 1 << numVars; // the truth table has 2^numVars elements
+    sizeTruthtable = 1 << sumOfProducts->numVars; // the truth table has 2^numVars elements
 
     refCntTable = (long*)calloc(sizeTruthtable, sizeof(long));
 
@@ -605,31 +582,31 @@ static void RemoveNonprimeImplicants(
     for (iOldTerm = 0; iOldTerm < numOldTerms; iOldTerm++)
     {
         // start by clearing all the don't care bits
-        (*terms)[iOldTerm] &= ~((*dontCares)[iOldTerm]);
+        sumOfProducts->terms[iOldTerm] &= ~(sumOfProducts->dontCares[iOldTerm]);
 
         while (1)
         {
-            refCntTable[(*terms)[iOldTerm]]++;
+            refCntTable[sumOfProducts->terms[iOldTerm]]++;
 
             // get the next minterm to ref count
             unsigned long iBitDC;
-            for (iBitDC = 0; iBitDC < numVars; iBitDC++)
+            for (iBitDC = 0; iBitDC < sumOfProducts->numVars; iBitDC++)
             {
                 bitMaskDC = 1 << iBitDC;
-                if ((*dontCares)[iOldTerm] & bitMaskDC)
+                if (sumOfProducts->dontCares[iOldTerm] & bitMaskDC)
                 {
-                    if ((*terms)[iOldTerm] & bitMaskDC)
+                    if (sumOfProducts->terms[iOldTerm] & bitMaskDC)
                     {
-                        (*terms)[iOldTerm] &= ~bitMaskDC;
+                        sumOfProducts->terms[iOldTerm] &= ~bitMaskDC;
                     }
                     else
                     {
-                        (*terms)[iOldTerm] |= bitMaskDC;
+                        sumOfProducts->terms[iOldTerm] |= bitMaskDC;
                         break;
                     }
                 }
             }
-            if (iBitDC == numVars)
+            if (iBitDC == sumOfProducts->numVars)
             {
                 break;
             }
@@ -640,12 +617,12 @@ static void RemoveNonprimeImplicants(
     for (iNewTerm = iOldTerm = 0; iOldTerm < numOldTerms; iOldTerm++)
     {
         isPrime = 0;
-        (*terms)[iOldTerm] &= ~((*dontCares)[iOldTerm]); // clear all the don't care bits
+        sumOfProducts->terms[iOldTerm] &= ~(sumOfProducts->dontCares[iOldTerm]); // clear all the don't care bits
 
         while (1)
         {
             // exit early if minterm is ref counted once, this term is a prime implicant and we will keep it
-            if (refCntTable[(*terms)[iOldTerm]] == 1)
+            if (refCntTable[sumOfProducts->terms[iOldTerm]] == 1)
             {
                 isPrime = 1;
                 break;
@@ -653,23 +630,23 @@ static void RemoveNonprimeImplicants(
 
             // get the next minterm to ref count
             unsigned long iBitDC;
-            for (iBitDC = 0; iBitDC < numVars; iBitDC++)
+            for (iBitDC = 0; iBitDC < sumOfProducts->numVars; iBitDC++)
             {
                 bitMaskDC = 1 << iBitDC;
-                if ((*dontCares)[iOldTerm] & bitMaskDC)
+                if (sumOfProducts->dontCares[iOldTerm] & bitMaskDC)
                 {
-                    if ((*terms)[iOldTerm] & bitMaskDC)
+                    if (sumOfProducts->terms[iOldTerm] & bitMaskDC)
                     {
-                        (*terms)[iOldTerm] &= ~bitMaskDC;
+                        sumOfProducts->terms[iOldTerm] &= ~bitMaskDC;
                     }
                     else
                     {
-                        (*terms)[iOldTerm] |= bitMaskDC;
+                        sumOfProducts->terms[iOldTerm] |= bitMaskDC;
                         break;
                     }
                 }
             }
-            if (iBitDC == numVars)
+            if (iBitDC == sumOfProducts->numVars)
             {
                 break;
             }
@@ -680,8 +657,8 @@ static void RemoveNonprimeImplicants(
             // keep this term, copy it down to the next spot
             if (iOldTerm != iNewTerm)
             {
-                (*terms)[iNewTerm] = (*terms)[iOldTerm];
-                (*dontCares)[iNewTerm] = (*dontCares)[iOldTerm];
+                sumOfProducts->terms[iNewTerm] = sumOfProducts->terms[iOldTerm];
+                sumOfProducts->dontCares[iNewTerm] = sumOfProducts->dontCares[iOldTerm];
             }
             iNewTerm++;
             numTermsKept++;
@@ -689,34 +666,34 @@ static void RemoveNonprimeImplicants(
         else
         {
             // this term is a non-prime implicant and will not be kept
-            (*numTerms)--;
+            sumOfProducts->numTerms--;
             numTermsRemoved++;
 
             // de-ref count this term's minterms
-            (*terms)[iOldTerm] &= ~((*dontCares)[iOldTerm]);
+            sumOfProducts->terms[iOldTerm] &= ~(sumOfProducts->dontCares[iOldTerm]);
             while (1)
             {
-                refCntTable[(*terms)[iOldTerm]]--;
+                refCntTable[sumOfProducts->terms[iOldTerm]]--;
 
                 // get the next minterm the needs its ref count decremented
                 unsigned long iBitDC;
-                for (iBitDC = 0; iBitDC < numVars; iBitDC++)
+                for (iBitDC = 0; iBitDC < sumOfProducts->numVars; iBitDC++)
                 {
                     bitMaskDC = 1 << iBitDC;
-                    if ((*dontCares)[iOldTerm] & bitMaskDC)
+                    if (sumOfProducts->dontCares[iOldTerm] & bitMaskDC)
                     {
-                        if ((*terms)[iOldTerm] & bitMaskDC)
+                        if (sumOfProducts->terms[iOldTerm] & bitMaskDC)
                         {
-                            (*terms)[iOldTerm] &= ~bitMaskDC;
+                            sumOfProducts->terms[iOldTerm] &= ~bitMaskDC;
                         }
                         else
                         {
-                            (*terms)[iOldTerm] |= bitMaskDC;
+                            sumOfProducts->terms[iOldTerm] |= bitMaskDC;
                             break;
                         }
                     }
                 }
-                if (iBitDC == numVars)
+                if (iBitDC == sumOfProducts->numVars)
                 {
                     break;
                 }
@@ -726,13 +703,13 @@ static void RemoveNonprimeImplicants(
 
     free(refCntTable);
 
-    if ((*numTerms) != numOldTerms)
+    if (sumOfProducts->numTerms != numOldTerms)
     {
         // we're just making these buffers smaller so it should never fail, but ignore the case that it does
         void* p;
-        p = realloc(*terms, (*numTerms) * sizeof(long));
-        *terms = (p || *numTerms == 0) ? p : *terms;
-        p = realloc(*dontCares, (*numTerms) * sizeof(long));
-        *dontCares = (p || *numTerms == 0) ? p : *dontCares;
+        p = realloc(sumOfProducts->terms, sumOfProducts->numTerms * sizeof(long));
+        sumOfProducts->terms = (p || sumOfProducts->numTerms == 0) ? p : sumOfProducts->terms;
+        p = realloc(sumOfProducts->dontCares, sumOfProducts->numTerms * sizeof(long));
+        sumOfProducts->dontCares = (p || sumOfProducts->numTerms == 0) ? p : sumOfProducts->dontCares;
     }
 }

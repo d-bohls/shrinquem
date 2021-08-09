@@ -8,6 +8,8 @@
 #include <math.h> // used for floor
 #include "shrinquem.h"
 
+#pragma warning( disable : 28159)
+
 #if defined(_WIN32)
 
 #include <windows.h>
@@ -38,6 +40,7 @@ static long GetTickCountForOS(void)
 
 #endif
 
+// Test function declarations
 static void TestSimpleExample(void);
 static void TestOneSpecificTruthTable(void);
 static void TestOneRandomTruthTable(void);
@@ -46,8 +49,9 @@ static void TestAllTruthTables(void);
 static void TestAllTruthTablesWithOneFalse(void);
 static void TestAllTruthTablesWithOneTrue(void);
 static void TestSomeRandomTruthTables(void);
-static void PrintEquation(const unsigned long numVars, const unsigned long numTerms, const unsigned long terms[], const unsigned long dontCares[]);
-static void TestAllInputs(const unsigned long numVars, const triLogic truthTable[], const unsigned long numTerms, const unsigned long terms[], const unsigned long dontCares[], unsigned long* numRight, unsigned long* numWrong);
+
+// Helper functions
+static void TestAllInputs(const SumOfProducts sumOfProducts, const triLogic truthTable[], unsigned long* numRight, unsigned long* numWrong);
 static long GetRandomLong(long min, long max);
 static void GetRandomBoolArray(unsigned long numElements, char boolArray[]);
 
@@ -72,18 +76,12 @@ static void TestSimpleExample(void)
     printf("\n\n============================================================");
     printf("\n\nPerforming TestSimpleExample test...\n\n");
 
-    const numVars = 4;
-    const triLogic truthTable[16] = { 1,1,1,0,0,1,1,1,1,0,0,1,0,0,1,1, };
-    unsigned long numTerms;
-    unsigned long* terms = NULL;
-    unsigned long* dontCares = NULL;
-    char* equation = NULL;
-    ReduceLogic(numVars, truthTable, &numTerms, &terms, &dontCares);
-    GenerateEquationString(numVars, NULL, numTerms, terms, dontCares, &equation);
-    printf("%s", equation);
-    free(terms);
-    free(dontCares);
-    free(equation);
+    const triLogic truthTable[16] = { 1,1,1,0,0,1,1,1,1,0,0,1,0,0,1,1 };
+    SumOfProducts sumOfProducts = { 4 };
+    ReduceLogic(truthTable, &sumOfProducts);
+    GenerateEquationString(&sumOfProducts, NULL);
+    printf("%s", sumOfProducts.equation);
+    FinalizeSumOfProducts(&sumOfProducts);
 
     printf("\n");
 }
@@ -91,9 +89,6 @@ static void TestSimpleExample(void)
 static void TestOneSpecificTruthTable(void)
 {
     enum shrinqStatus retVal;
-    unsigned long numTerms;
-    unsigned long* terms = NULL;
-    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -103,7 +98,7 @@ static void TestOneSpecificTruthTable(void)
 
     ResetTermCounters();
 
-    const numVars = 4;
+    SumOfProducts sumOfProducts = { 4 };
     const triLogic truthTable[16] =
     {
         1,1,1,0,
@@ -113,16 +108,16 @@ static void TestOneSpecificTruthTable(void)
     };
 
     unsigned long timer = GetTickCountForOS();
-    retVal = ReduceLogic(numVars, truthTable, &numTerms, &terms, &dontCares);
+    retVal = ReduceLogic(truthTable, &sumOfProducts);
     timer = GetTickCountForOS() - timer;
-    printf("Test took %i %s with %i variables...\n", timer, unitsGetTickCount, numVars);
+    printf("Test took %i %s with %i variables...\n", timer, unitsGetTickCount, sumOfProducts.numVars);
 
     if (retVal == STATUS_OKAY)
     {
-        PrintEquation(numVars, numTerms, terms, dontCares);
-        TestAllInputs(numVars, truthTable, numTerms, terms, dontCares, &numRight, &numWrong);
-        free(terms);
-        free(dontCares);
+        GenerateEquationString(&sumOfProducts, NULL);
+        printf("\n%s\n", sumOfProducts.equation);
+        TestAllInputs(sumOfProducts, truthTable, &numRight, &numWrong);
+        FinalizeSumOfProducts(&sumOfProducts);
     }
     else
     {
@@ -140,9 +135,6 @@ static void TestOneSpecificTruthTable(void)
 static void TestOneRandomTruthTable(void)
 {
     enum shrinqStatus retVal;
-    unsigned long numTerms;
-    unsigned long* terms = NULL;
-    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -152,23 +144,23 @@ static void TestOneRandomTruthTable(void)
 
     ResetTermCounters();
 
-    const unsigned long numVars = 5;
-    unsigned long numOfPossibleInputs = 1 << numVars;
+    SumOfProducts sumOfProducts = { 5 };
+    unsigned long numOfPossibleInputs = 1 << sumOfProducts.numVars;
     size_t memSize = numOfPossibleInputs * sizeof(triLogic);
     triLogic* truthTable = (triLogic*)malloc(memSize);
     GetRandomBoolArray(numOfPossibleInputs, truthTable);
 
     unsigned long timer = GetTickCountForOS();
-    retVal = ReduceLogic(numVars, truthTable, &numTerms, &terms, &dontCares);
+    retVal = ReduceLogic(truthTable, &sumOfProducts);
     timer = GetTickCountForOS() - timer;
-    printf("Test took %i %s with %i variables...\n", timer, unitsGetTickCount, numVars);
+    printf("Test took %i %s with %i variables...\n", timer, unitsGetTickCount, sumOfProducts.numVars);
 
     if (retVal == STATUS_OKAY)
     {
-        PrintEquation(numVars, numTerms, terms, dontCares);
-        TestAllInputs(numVars, truthTable, numTerms, terms, dontCares, &numRight, &numWrong);
-        free(terms);
-        free(dontCares);
+        GenerateEquationString(&sumOfProducts, NULL);
+        printf("\n%s\n", sumOfProducts.equation);
+        TestAllInputs(sumOfProducts, truthTable, &numRight, &numWrong);
+        FinalizeSumOfProducts(&sumOfProducts);
     }
     else
     {
@@ -186,9 +178,6 @@ static void TestOneRandomTruthTable(void)
 static void TestEquationGeneration(void)
 {
     enum shrinqStatus retVal;
-    unsigned long numTerms;
-    unsigned long* terms = NULL;
-    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -198,20 +187,20 @@ static void TestEquationGeneration(void)
 
     ResetTermCounters();
 
-    const unsigned long numVars = 4;
-    unsigned long numOfPossibleInputs = 1 << numVars;
+    SumOfProducts sumOfProducts = { 4 };
+    unsigned long numOfPossibleInputs = 1 << sumOfProducts.numVars;
     size_t memSize = numOfPossibleInputs * sizeof(triLogic);
     triLogic* truthTable = (triLogic*)malloc(memSize);
     GetRandomBoolArray(numOfPossibleInputs, truthTable);
 
     unsigned long timer = GetTickCountForOS();
-    retVal = ReduceLogic(numVars, truthTable, &numTerms, &terms, &dontCares);
+    retVal = ReduceLogic(truthTable, &sumOfProducts);
     timer = GetTickCountForOS() - timer;
-    printf("Test took %i %s with %i variables...\n", timer, unitsGetTickCount, numVars);
+    printf("Test took %i %s with %i variables...\n", timer, unitsGetTickCount, sumOfProducts.numVars);
 
     if (retVal == STATUS_OKAY)
     {
-        TestAllInputs(numVars, truthTable, numTerms, terms, dontCares, &numRight, &numWrong);
+        TestAllInputs(sumOfProducts, truthTable, &numRight, &numWrong);
 
         char* variableNames[] =
         {
@@ -221,17 +210,10 @@ static void TestEquationGeneration(void)
             "Mango",
         };
 
-        char* equation;
-        GenerateEquationString(numVars, variableNames, numTerms, terms, dontCares, &equation);
-        if (equation)
-        {
-            printf("\n%s\n", equation);
-            free(equation);
-            equation = NULL;
-        }
-
-        free(terms);
-        free(dontCares);
+        GenerateEquationString(&sumOfProducts, variableNames);
+        printf("\n%s\n", sumOfProducts.equation);
+        TestAllInputs(sumOfProducts, truthTable, &numRight, &numWrong);
+        FinalizeSumOfProducts(&sumOfProducts);
     }
     else
     {
@@ -253,10 +235,7 @@ static void TestAllTruthTables(void)
     unsigned long numOfPossibleTruthTables;
     unsigned long iNumVars;
     unsigned long iInput;
-    unsigned long numTerms;
     triLogic* truthTable = NULL;
-    unsigned long* terms = NULL;
-    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -285,18 +264,18 @@ static void TestAllTruthTables(void)
 
         while (1)
         {
-            retVal = ReduceLogic(iNumVars, truthTable, &numTerms, &terms, &dontCares);
+            SumOfProducts sumOfProducts = { iNumVars };
+            retVal = ReduceLogic(truthTable, &sumOfProducts);
             if (retVal == STATUS_OKAY)
             {
                 if (printEquation)
                 {
-                    PrintEquation(iNumVars, numTerms, terms, dontCares);
+                    GenerateEquationString(&sumOfProducts, NULL);
+                    printf("\n%s\n", sumOfProducts.equation);
                 }
-                TestAllInputs(iNumVars, truthTable, numTerms, terms, dontCares, &numRight, &numWrong);
-                free(terms);
-                free(dontCares);
-                terms = NULL;
-                dontCares = NULL;
+
+                TestAllInputs(sumOfProducts, truthTable, &numRight, &numWrong);
+                FinalizeSumOfProducts(&sumOfProducts);
             }
             else
             {
@@ -335,10 +314,7 @@ static void TestAllTruthTables(void)
 static void TestAllTruthTablesWithOneFalse(void)
 {
     enum shrinqStatus retVal;
-    unsigned long numTerms;
     triLogic* truthTable = NULL;
-    unsigned long* terms = NULL;
-    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -368,14 +344,13 @@ static void TestAllTruthTablesWithOneFalse(void)
                 truthTable[iInput] = LOGIC_TRUE;
             }
             truthTable[iFalse] = LOGIC_FALSE;
-            retVal = ReduceLogic(iVars, truthTable, &numTerms, &terms, &dontCares);
+
+            SumOfProducts sumOfProducts = { iVars };
+            retVal = ReduceLogic(truthTable, &sumOfProducts);
             if (retVal == STATUS_OKAY)
             {
-                TestAllInputs(iVars, truthTable, numTerms, terms, dontCares, &numRight, &numWrong);
-                free(terms);
-                free(dontCares);
-                terms = NULL;
-                dontCares = NULL;
+                TestAllInputs(sumOfProducts, truthTable, &numRight, &numWrong);
+                FinalizeSumOfProducts(&sumOfProducts);
             }
             else
             {
@@ -398,10 +373,7 @@ static void TestAllTruthTablesWithOneFalse(void)
 static void TestAllTruthTablesWithOneTrue(void)
 {
     enum shrinqStatus retVal;
-    unsigned long numTerms;
     triLogic* truthTable = NULL;
-    unsigned long* terms = NULL;
-    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -431,14 +403,13 @@ static void TestAllTruthTablesWithOneTrue(void)
                 truthTable[iInput] = LOGIC_FALSE;
             }
             truthTable[iTrue] = LOGIC_TRUE;
-            retVal = ReduceLogic(iVars, truthTable, &numTerms, &terms, &dontCares);
+
+            SumOfProducts sumOfProducts = { iVars };
+            retVal = ReduceLogic(truthTable, &sumOfProducts);
             if (retVal == STATUS_OKAY)
             {
-                TestAllInputs(iVars, truthTable, numTerms, terms, dontCares, &numRight, &numWrong);
-                free(terms);
-                free(dontCares);
-                terms = NULL;
-                dontCares = NULL;
+                TestAllInputs(sumOfProducts, truthTable, &numRight, &numWrong);
+                FinalizeSumOfProducts(&sumOfProducts);
             }
             else
             {
@@ -466,12 +437,8 @@ static void TestSomeRandomTruthTables(void)
 
     enum shrinqStatus retVal;
     unsigned long iTest;
-    unsigned long numVars;
     unsigned long numOfPossibleInputs;
-    unsigned long numTerms;
     triLogic* truthTable = NULL;
-    unsigned long* terms = NULL;
-    unsigned long* dontCares = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -484,19 +451,17 @@ static void TestSomeRandomTruthTables(void)
 
     for (iTest = 1; iTest <= numTests; iTest++)
     {
-        numVars = GetRandomLong(minVar, maxVar);
-        numOfPossibleInputs = 1 << numVars;
+        SumOfProducts sumOfProducts = { GetRandomLong(minVar, maxVar) };
+        numOfPossibleInputs = 1 << sumOfProducts.numVars;
         truthTable = malloc(numOfPossibleInputs * sizeof(long));
         GetRandomBoolArray(numOfPossibleInputs, truthTable);
-        printf("Test %i with %i variables...\n", iTest, numVars);
-        retVal = ReduceLogic(numVars, truthTable, &numTerms, &terms, &dontCares);
+        printf("Test %i with %i variables...\n", iTest, sumOfProducts.numVars);
+
+        retVal = ReduceLogic(truthTable, &sumOfProducts);
         if (retVal == STATUS_OKAY)
         {
-            TestAllInputs(numVars, truthTable, numTerms, terms, dontCares, &numRight, &numWrong);
-            free(terms);
-            free(dontCares);
-            terms = NULL;
-            dontCares = NULL;
+            TestAllInputs(sumOfProducts, truthTable, &numRight, &numWrong);
+            FinalizeSumOfProducts(&sumOfProducts);
         }
         else
         {
@@ -533,16 +498,13 @@ static void GetRandomBoolArray(
 }
 
 static void TestAllInputs(
-    const unsigned long numVars,
+    const SumOfProducts sumOfProducts,
     const triLogic truthTable[],
-    const unsigned long numTerms,
-    const unsigned long terms[],
-    const unsigned long dontCares[],
     unsigned long* numRight,
     unsigned long* numWrong)
 {
     triLogic result;
-    unsigned long numOfPossibleInputs = 1 << numVars;
+    unsigned long numOfPossibleInputs = 1 << sumOfProducts.numVars;
 
     for (unsigned long iInput = 0; iInput < numOfPossibleInputs; iInput++)
     {
@@ -550,27 +512,11 @@ static void TestAllInputs(
             (*numRight)++;
         else
         {
-            result = EvaluateSumOfProducts(numVars, numTerms, terms, dontCares, iInput);
+            result = EvaluateSumOfProducts(sumOfProducts, iInput);
             if (truthTable[iInput] == result)
                 (*numRight)++;
             else
                 (*numWrong)++;
         }
-    }
-}
-
-static void PrintEquation(
-    const unsigned long numVars,
-    const unsigned long numTerms,
-    const unsigned long terms[],
-    const unsigned long dontCares[])
-{
-    char* equation = NULL;
-    GenerateEquationString(numVars, NULL, numTerms, terms, dontCares, &equation);
-    if (equation)
-    {
-        printf("\n%s\n", equation);
-        free(equation);
-        equation = NULL;
     }
 }

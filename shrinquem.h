@@ -20,30 +20,33 @@ enum shrinqStatus
     STATUS_NULL_ARGUMENT,
 };
 
-extern enum shrinqStatus ReduceLogic(
-    const unsigned long numVars,
+typedef struct SumOfProducts
+{
+    unsigned long numVars;
+    unsigned long numTerms;
+    unsigned long* terms;
+    unsigned long* dontCares;
+    char* equation;
+} SumOfProducts;
+
+void FinalizeSumOfProducts(
+    SumOfProducts* sumOfProducts);
+
+enum shrinqStatus ReduceLogic(
     const triLogic truthTable[],
-    unsigned long* numTerms,
-    unsigned long* terms[],
-    unsigned long* dontCares[]);
+    SumOfProducts* sumOfProducts);
 
-extern enum shrinqStatus GenerateEquationString(
-    const unsigned long numVars,
-    char* varNames[],
-    const unsigned long numTerms,
-    const unsigned long terms[],
-    const unsigned long dontCares[],
-    char* equation[]);
+enum shrinqStatus GenerateEquationString(
+    SumOfProducts* sumOfProducts,
+    const char** const varNames);
 
-extern triLogic EvaluateSumOfProducts(
-    const unsigned long numVars,
-    const unsigned long numTerms,
-    const unsigned long terms[],
-    const unsigned long dontCares[],
+triLogic EvaluateSumOfProducts(
+    const SumOfProducts sumOfProducts,
     const unsigned long input);
 
-extern void ResetTermCounters();
-extern unsigned long GetNumTermsKept();
-extern unsigned long GetNumTermsRemoved();
+// functions used for metrics and testing
+void ResetTermCounters();
+unsigned long GetNumTermsKept();
+unsigned long GetNumTermsRemoved();
 
 #endif // !defined(INC_SHRINQUEM_H)
