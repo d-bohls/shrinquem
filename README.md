@@ -25,22 +25,15 @@ Shrinquem can be used to find a minimum sum-of-products representation for this 
 
 int main(int argc, char* argv[])
 {
-  const numVars = 3;
-  const triLogic truthTable[8] = { 1,1,0,1,1,0,0,0 };
-  unsigned long numTerms;
-  unsigned long* terms = NULL;
-  unsigned long* dontCares = NULL;
-  char* equation = NULL;
+    const numVars = 3;
+    const triLogic truthTable[8] = { 1,1,0,1,1,0,0,0 };
+    SumOfProducts sumOfProducts = { numVars };
+    ReduceLogic(truthTable, &sumOfProducts);
+    GenerateEquationString(&sumOfProducts, NULL);
+    printf("f(A, B, C) = %s", sumOfProducts.equation);
+    FinalizeSumOfProducts(&sumOfProducts);
 
-  ReduceLogic(numVars, truthTable, &numTerms, &terms, &dontCares);
-  GenerateEquationString(numVars, NULL, numTerms, terms, dontCares, &equation);
-  printf("f(A, B, C) = %s", equation);
-
-  free(terms);
-  free(dontCares);
-  free(equation);
-
-  return 0;
+    return 0;
 }
 ```
 
@@ -70,28 +63,21 @@ Shrinquem can be used to generate the equation as follows:
 
 int main(int argc, char* argv[])
 {
-  const numVars = 2;
-  const triLogic truthTable[4] =
-  {
-      LOGIC_FALSE,
-      LOGIC_TRUE,
-      LOGIC_FALSE,
-      LOGIC_DONT_CARE
-  };
-  unsigned long numTerms;
-  unsigned long* terms = NULL;
-  unsigned long* dontCares = NULL;
-  char* equation = NULL;
+    const numVars = 2;
+    const triLogic truthTable[4] =
+    {
+        LOGIC_FALSE,
+        LOGIC_TRUE,
+        LOGIC_FALSE,
+        LOGIC_DONT_CARE
+    };
+    SumOfProducts sumOfProducts = { numVars };
+    ReduceLogic(truthTable, &sumOfProducts);
+    GenerateEquationString(&sumOfProducts, NULL);
+    printf("f(A, B) = %s", sumOfProducts.equation);
+    FinalizeSumOfProducts(&sumOfProducts);
 
-  ReduceLogic(numVars, truthTable, &numTerms, &terms, &dontCares);
-  GenerateEquationString(numVars, NULL, numTerms, terms, dontCares, &equation);
-  printf("f(A, B) = %s", equation);
-
-  free(terms);
-  free(dontCares);
-  free(equation);
-
-  return 0;
+    return 0;
 }
 ```
 

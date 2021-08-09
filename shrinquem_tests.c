@@ -41,6 +41,8 @@ static long GetTickCountForOS(void)
 #endif
 
 // Test function declarations
+static void GitHubExample1(void);
+static void GitHubExample2(void);
 static void TestSimpleExample(void);
 static void TestOneSpecificTruthTable(void);
 static void TestOneRandomTruthTable(void);
@@ -59,6 +61,8 @@ int main(int argc, char* argv[])
 {
     srand((unsigned int)time(NULL));
 
+    GitHubExample1();
+    GitHubExample2();
     TestSimpleExample();
     TestOneSpecificTruthTable();
     TestOneRandomTruthTable();
@@ -67,23 +71,51 @@ int main(int argc, char* argv[])
     TestAllTruthTablesWithOneFalse();
     TestAllTruthTablesWithOneTrue();
     TestSomeRandomTruthTables();
-
     return 0;
+}
+
+static void GitHubExample1(void)
+{
+    printf("\n\n============================================================");
+    printf("\n\nGitHub example 1...\n\n");
+    const numVars = 3;
+    const triLogic truthTable[8] = { 1,1,0,1,1,0,0,0 };
+    SumOfProducts sumOfProducts = { numVars };
+    ReduceLogic(truthTable, &sumOfProducts);
+    GenerateEquationString(&sumOfProducts, NULL);
+    printf("%s\n", sumOfProducts.equation);
+    FinalizeSumOfProducts(&sumOfProducts);
+}
+
+static void GitHubExample2(void)
+{
+    printf("\n\n============================================================");
+    printf("\n\nGitHub example 2...\n\n");
+    const numVars = 2;
+    const triLogic truthTable[4] =
+    {
+        LOGIC_FALSE,
+        LOGIC_TRUE,
+        LOGIC_FALSE,
+        LOGIC_DONT_CARE
+    };
+    SumOfProducts sumOfProducts = { numVars };
+    ReduceLogic(truthTable, &sumOfProducts);
+    GenerateEquationString(&sumOfProducts, NULL);
+    printf("%s\n", sumOfProducts.equation);
+    FinalizeSumOfProducts(&sumOfProducts);
 }
 
 static void TestSimpleExample(void)
 {
     printf("\n\n============================================================");
     printf("\n\nPerforming TestSimpleExample test...\n\n");
-
     const triLogic truthTable[16] = { 1,1,1,0,0,1,1,1,1,0,0,1,0,0,1,1 };
     SumOfProducts sumOfProducts = { 4 };
     ReduceLogic(truthTable, &sumOfProducts);
     GenerateEquationString(&sumOfProducts, NULL);
-    printf("%s", sumOfProducts.equation);
+    printf("%s\n", sumOfProducts.equation);
     FinalizeSumOfProducts(&sumOfProducts);
-
-    printf("\n");
 }
 
 static void TestOneSpecificTruthTable(void)
