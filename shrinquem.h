@@ -11,14 +11,14 @@ typedef char triLogic;
 #define LOGIC_TRUE      (1)
 #define LOGIC_DONT_CARE (2)
 
-enum shrinqStatus
+typedef enum
 {
     STATUS_OKAY = 0,
     STATUS_TOO_FEW_VARIABLES,
     STATUS_TOO_MANY_VARIABLES,
     STATUS_OUT_OF_MEMORY,
     STATUS_NULL_ARGUMENT,
-};
+} shrinquemStatus;
 
 typedef struct SumOfProducts
 {
@@ -32,11 +32,11 @@ typedef struct SumOfProducts
 void FinalizeSumOfProducts(
     SumOfProducts* sumOfProducts);
 
-enum shrinqStatus ReduceLogic(
+shrinquemStatus ReduceLogic(
     const triLogic truthTable[],
     SumOfProducts* sumOfProducts);
 
-enum shrinqStatus GenerateEquationString(
+shrinquemStatus GenerateEquationString(
     SumOfProducts* sumOfProducts,
     const char** const varNames);
 

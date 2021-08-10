@@ -120,7 +120,7 @@ static void TestSimpleExample(void)
 
 static void TestOneSpecificTruthTable(void)
 {
-    enum shrinqStatus retVal;
+    shrinquemStatus retVal;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -166,7 +166,7 @@ static void TestOneSpecificTruthTable(void)
 
 static void TestOneRandomTruthTable(void)
 {
-    enum shrinqStatus retVal;
+    shrinquemStatus retVal;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -209,7 +209,7 @@ static void TestOneRandomTruthTable(void)
 
 static void TestEquationGeneration(void)
 {
-    enum shrinqStatus retVal;
+    shrinquemStatus retVal;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
     unsigned long numFailures = 0;
@@ -262,7 +262,7 @@ static void TestEquationGeneration(void)
 
 static void TestAllTruthTables(void)
 {
-    enum shrinqStatus retVal;
+    shrinquemStatus retVal;
     unsigned long numOfPossibleInputs;
     unsigned long numOfPossibleTruthTables;
     unsigned long iNumVars;
@@ -345,7 +345,7 @@ static void TestAllTruthTables(void)
 
 static void TestAllTruthTablesWithOneFalse(void)
 {
-    enum shrinqStatus retVal;
+    shrinquemStatus retVal;
     triLogic* truthTable = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
@@ -404,7 +404,7 @@ static void TestAllTruthTablesWithOneFalse(void)
 
 static void TestAllTruthTablesWithOneTrue(void)
 {
-    enum shrinqStatus retVal;
+    shrinquemStatus retVal;
     triLogic* truthTable = NULL;
     unsigned long numRight = 0;
     unsigned long numWrong = 0;
@@ -467,7 +467,7 @@ static void TestSomeRandomTruthTables(void)
     const unsigned long minVar = 13;
     const unsigned long maxVar = 15;
 
-    enum shrinqStatus retVal;
+    shrinquemStatus retVal;
     unsigned long iTest;
     unsigned long numOfPossibleInputs;
     triLogic* truthTable = NULL;
