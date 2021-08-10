@@ -292,15 +292,9 @@ shrinquemStatus GenerateEquationString(
     SumOfProducts* sumOfProducts,
     const char** const varNames)
 {
-    shrinquemStatus retVal = STATUS_OKAY;
-    unsigned long done = 0;
     unsigned long iVar;
     unsigned long iTerm;
-    unsigned long iEquPos;
-    unsigned long iTermPos;
-    unsigned long iCharPos;
     unsigned long bitMask;
-    size_t outputSize;
     char** varNamesAuto = NULL;
     const char** varNamesToUse = NULL;
     size_t* varNameSizes = NULL;
@@ -317,151 +311,137 @@ shrinquemStatus GenerateEquationString(
 
         sumOfProducts->equation[0] = '0';
         sumOfProducts->equation[1] = 0;
-        done = 1;
+        return STATUS_OKAY;
     }
-    else
+
+    // now check for a '1' (one term with all don't cares)
+    if (sumOfProducts->numTerms == 1)
     {
-
-        // now check for a '1' (one term with all don't cares)
-        if (sumOfProducts->numTerms == 1)
+        for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
         {
-            for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
+            bitMask = 1 << iVar;
+            if ((sumOfProducts->dontCares[0] & bitMask) == 0)
             {
-                bitMask = 1 << iVar;
-                if ((sumOfProducts->dontCares[0] & bitMask) == 0)
-                {
-                    break;
-                }
-            }
-
-            if (iVar == sumOfProducts->numVars)
-            {
-                sumOfProducts->equation = (char*)malloc(2 * sizeof(char));
-                if (sumOfProducts->equation == NULL)
-                    return STATUS_OUT_OF_MEMORY;
-                sumOfProducts->equation[0] = '1';
-                sumOfProducts->equation[1] = 0;
-                done = 1;
+                break;
             }
         }
 
-        // if the equation isn't '0' or '1' then build the string
-        if (done == 0)
+        if (iVar == sumOfProducts->numVars)
         {
-
-            // auto-name variables if names were not provided
-            if (varNames != NULL)
-            {
-                varNamesToUse = varNames;
-            }
-            else
-            {
-                varNamesAuto = (char**)malloc(sumOfProducts->numVars * sizeof(char*));
-                varNamesToUse = varNamesAuto;
-                if (varNamesAuto == NULL)
-                    return STATUS_OUT_OF_MEMORY;
-
-                for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
-                {
-                    varNamesAuto[iVar] = NULL;
-                }
-
-                for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
-                {
-                    if (varNamesAuto[iVar] == NULL)
-                    {
-                        varNamesAuto[iVar] = (char*)malloc(2 * sizeof(char));
-                        if (varNamesAuto[iVar] == 0)
-                            return STATUS_OUT_OF_MEMORY;
-                        (varNamesAuto[iVar])[0] = 'A' + (char)iVar;
-                        (varNamesAuto[iVar])[1] = 0;
-                    }
-                }
-            }
-
-            // first calculate the size of the string names for the variables
-            varNameSizes = (size_t*)malloc(sizeof(long*) * sumOfProducts->numVars);
-            if (varNameSizes == NULL)
-                return STATUS_OUT_OF_MEMORY;
-
-            for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
-            {
-                varNameSizes[iVar] = strlen(varNamesToUse[iVar]);
-            }
-
-            // now run through the equation to determine the length of the output string
-            iTermPos = 0;
-            iEquPos = 0;
-            outputSize = 0;
-            for (iTerm = 0; iTerm < sumOfProducts->numTerms; iTerm++)
-            {
-                for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
-                {
-                    bitMask = 1 << (sumOfProducts->numVars - iVar - 1);
-                    if ((sumOfProducts->dontCares[iTerm] & bitMask) == 0)
-                    {
-                        outputSize += varNameSizes[iVar];
-                        if ((sumOfProducts->terms[iTerm] & bitMask) == 0)
-                        {
-                            outputSize++;
-                        }
-                    }
-
-                    iTermPos++;
-                }
-
-                if (iTerm < (sumOfProducts->numTerms - 1))
-                {
-                    outputSize += 3; // account for the " + "
-                }
-                else
-                {
-                    outputSize++; // account for the null terminator
-                }
-            }
-
-            // allocate space for the equation
-            sumOfProducts->equation = (char*)malloc(outputSize * sizeof(char*));
+            sumOfProducts->equation = (char*)malloc(2 * sizeof(char));
             if (sumOfProducts->equation == NULL)
                 return STATUS_OUT_OF_MEMORY;
+            sumOfProducts->equation[0] = '1';
+            sumOfProducts->equation[1] = 0;
+            return STATUS_OKAY;
+        }
+    }
 
-            // use termTable and numTerms to generate equation
-            iTermPos = iEquPos = 0;
-            for (iTerm = 0; iTerm < sumOfProducts->numTerms; iTerm++)
+    // auto-name variables if names were not provided
+    if (varNames != NULL)
+    {
+        varNamesToUse = varNames;
+    }
+    else
+    {
+        varNamesAuto = (char**)malloc(sumOfProducts->numVars * sizeof(char*));
+        varNamesToUse = varNamesAuto;
+        if (varNamesAuto == NULL)
+            return STATUS_OUT_OF_MEMORY;
+
+        for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
+        {
+            varNamesAuto[iVar] = NULL;
+        }
+
+        for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
+        {
+            if (varNamesAuto[iVar] == NULL)
             {
-                for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
-                {
-                    bitMask = 1 << (sumOfProducts->numVars - iVar - 1);
-                    if ((sumOfProducts->dontCares[iTerm] & bitMask) == 0)
-                    {
-                        // copy the variable name
-                        for (iCharPos = 0; iCharPos < varNameSizes[iVar]; iCharPos++)
-                        {
-                            sumOfProducts->equation[iEquPos++] = (varNamesToUse[iVar])[iCharPos];
-                        }
+                varNamesAuto[iVar] = (char*)malloc(2 * sizeof(char));
+                if (varNamesAuto[iVar] == 0)
+                    return STATUS_OUT_OF_MEMORY;
+                (varNamesAuto[iVar])[0] = 'A' + (char)iVar;
+                (varNamesAuto[iVar])[1] = 0;
+            }
+        }
+    }
 
-                        // place the complement sign of false
-                        if ((sumOfProducts->terms[iTerm] & bitMask) == 0)
-                        {
-                            sumOfProducts->equation[iEquPos++] = '\'';
-                        }
-                    }
-                    iTermPos++;
-                }
+    // first calculate the size of the string names for the variables
+    varNameSizes = (size_t*)malloc(sizeof(long*) * sumOfProducts->numVars);
+    if (varNameSizes == NULL)
+        return STATUS_OUT_OF_MEMORY;
 
-                if (iTerm < (sumOfProducts->numTerms - 1))
+    for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
+    {
+        varNameSizes[iVar] = strlen(varNamesToUse[iVar]);
+    }
+
+    // now run through the equation to determine the length of the output string
+    size_t outputSize = 0;
+
+    for (iTerm = 0; iTerm < sumOfProducts->numTerms; iTerm++)
+    {
+        for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
+        {
+            bitMask = 1 << (sumOfProducts->numVars - iVar - 1);
+            if ((sumOfProducts->dontCares[iTerm] & bitMask) == 0)
+            {
+                outputSize += varNameSizes[iVar];
+                if ((sumOfProducts->terms[iTerm] & bitMask) == 0)
                 {
-                    sumOfProducts->equation[iEquPos++] = ' ';
-                    sumOfProducts->equation[iEquPos++] = '+';
-                    sumOfProducts->equation[iEquPos++] = ' ';
-                }
-                else
-                {
-                    sumOfProducts->equation[iEquPos++] = 0;
+                    outputSize++;
                 }
             }
+        }
 
-            done = 1;
+        if (iTerm < (sumOfProducts->numTerms - 1))
+        {
+            outputSize += 3; // account for the " + "
+        }
+        else
+        {
+            outputSize++; // account for the null terminator
+        }
+    }
+
+    // allocate space for the equation
+    sumOfProducts->equation = (char*)malloc(outputSize * sizeof(char*));
+    if (sumOfProducts->equation == NULL)
+        return STATUS_OUT_OF_MEMORY;
+
+    // use termTable and numTerms to generate equation
+    unsigned long iEquPos = 0;
+    for (iTerm = 0; iTerm < sumOfProducts->numTerms; iTerm++)
+    {
+        for (iVar = 0; iVar < sumOfProducts->numVars; iVar++)
+        {
+            bitMask = 1 << (sumOfProducts->numVars - iVar - 1);
+            if ((sumOfProducts->dontCares[iTerm] & bitMask) == 0)
+            {
+                // copy the variable name
+                for (unsigned long iCharPos = 0; iCharPos < varNameSizes[iVar]; iCharPos++)
+                {
+                    sumOfProducts->equation[iEquPos++] = (varNamesToUse[iVar])[iCharPos];
+                }
+
+                // place the complement sign of false
+                if ((sumOfProducts->terms[iTerm] & bitMask) == 0)
+                {
+                    sumOfProducts->equation[iEquPos++] = '\'';
+                }
+            }
+        }
+
+        if (iTerm < (sumOfProducts->numTerms - 1))
+        {
+            sumOfProducts->equation[iEquPos++] = ' ';
+            sumOfProducts->equation[iEquPos++] = '+';
+            sumOfProducts->equation[iEquPos++] = ' ';
+        }
+        else
+        {
+            sumOfProducts->equation[iEquPos++] = 0;
         }
     }
 
@@ -489,7 +469,7 @@ shrinquemStatus GenerateEquationString(
         varNameSizes = NULL;
     }
 
-    return retVal;
+    return STATUS_OKAY;
 }
 
 /*************************************************************************
