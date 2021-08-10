@@ -83,7 +83,7 @@ static void GitHubExample1(void)
     SumOfProducts sumOfProducts = { numVars };
     ReduceLogic(truthTable, &sumOfProducts);
     GenerateEquationString(&sumOfProducts, NULL);
-    printf("%s\n", sumOfProducts.equation);
+    printf("f(A, B, C) = %s", sumOfProducts.equation);
     FinalizeSumOfProducts(&sumOfProducts);
 }
 
@@ -102,7 +102,7 @@ static void GitHubExample2(void)
     SumOfProducts sumOfProducts = { numVars };
     ReduceLogic(truthTable, &sumOfProducts);
     GenerateEquationString(&sumOfProducts, NULL);
-    printf("%s\n", sumOfProducts.equation);
+    printf("f(A, B) = %s", sumOfProducts.equation);
     FinalizeSumOfProducts(&sumOfProducts);
 }
 
