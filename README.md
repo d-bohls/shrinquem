@@ -1,5 +1,5 @@
 # shrinquem
-An algorithm for logic minimization.
+An algorithm for Boolean logic minimization.
 
 ## 1. An Example
 
